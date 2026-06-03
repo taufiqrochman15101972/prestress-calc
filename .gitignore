@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.*
+!.env.local.example
+
+# Next.js
+prestress-calc/.next/
+prestress-calc/node_modules/
+
+# Screenshots
+prestress-calc/ss-*.png
+
+# PDF books (too large for git)
+*.pdf
