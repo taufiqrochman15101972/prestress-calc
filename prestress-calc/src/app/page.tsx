@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import { InputPanel } from "@/components/InputPanel";
 import { ResultsPanel } from "@/components/ResultsPanel";
+import { ExtraCalculators } from "@/components/ExtraCalculators";
 import { useDesignStore } from "@/store/useDesignStore";
 import { openPrintReport } from "@/lib/report";
 
@@ -12,6 +13,7 @@ export default function Home() {
     settings, setUnitSystem, setFormulaVariant,
     updatePartialPrestress,
   } = useDesignStore();
+  const [extraOpen, setExtraOpen] = React.useState(false);
 
   useEffect(() => {
     const restored = loadFromLocal();
@@ -112,6 +114,17 @@ export default function Home() {
           </button>
         </div>
 
+        {/* Extra calculators */}
+        <button
+          onClick={() => setExtraOpen(true)}
+          className="flex items-center gap-1 px-2 py-1.5 rounded bg-white/15 hover:bg-white/25
+            text-white text-xs font-semibold border border-white/30 transition-colors"
+          title="Kalkulator tambahan: Tiang, Kolom, Pelat PT"
+        >
+          <span>🔧</span>
+          <span className="hidden sm:inline">Kalkulator</span>
+        </button>
+
         {/* Print report */}
         <button
           onClick={handlePrint}
@@ -129,6 +142,8 @@ export default function Home() {
         <InputPanel />
         <ResultsPanel />
       </main>
+
+      <ExtraCalculators open={extraOpen} onClose={() => setExtraOpen(false)} />
     </div>
   );
 }
