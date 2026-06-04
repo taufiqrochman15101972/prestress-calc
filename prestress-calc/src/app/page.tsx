@@ -19,8 +19,8 @@ export default function Home() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePrint = useCallback(() => {
-    if (results) openPrintReport(inputs, results);
-  }, [inputs, results]);
+    if (results) openPrintReport(inputs, results, settings);
+  }, [inputs, results, settings]);
 
   const { unitSystem, formulaVariant } = settings;
   const isPartial = inputs.partialPrestress.enabled;
