@@ -528,6 +528,67 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
           </tbody></table>
         </>
       )}
+
+      {/* PPR */}
+      {r.PPR !== undefined && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Partial Prestress Ratio (PPR)</p>
+          <table className="w-full"><tbody>
+            <ResultRow label="PPR = Aps·fps / (Aps·fps + As·fy)"
+              value={fmt(r.PPR * 100, 1)} unit="%" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1">
+            PPR = 1.0 = prategang penuh &nbsp;·&nbsp; PPR &lt; 1.0 = sebagian (As berkontribusi)
+          </div>
+        </>
+      )}
+
+      {/* Torsion */}
+      {r.torsion && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Torsi (ACI 318-19 §22.7)</p>
+          <table className="w-full"><tbody>
+            <ResultRow label="T_u terfaktor" value={fmt(inputs.loads.tuTorsion)} unit="kN·m" />
+            <ResultRow label="T_th (ambang abaikan)" value={fmt(r.torsion.T_th)} unit="kN·m" />
+            <ResultRow label="T_cr (momen retak torsi)" value={fmt(r.torsion.T_cr)} unit="kN·m" />
+            <ResultRow label="θ (sudut strut)" value={fmt(r.torsion.theta_deg, 1)} unit="°" />
+            <ResultRow label="At/s (tulangan transversal)" value={r.torsion.isNegligible ? "—" : fmt(r.torsion.At_per_s, 4)} unit="mm²/mm" />
+            <ResultRow label="Al (tulangan longitudinal)" value={r.torsion.isNegligible ? "—" : fmt(r.torsion.Al_req, 0)} unit="mm²" />
+            <ResultRow label="Rasio gabungan V+T" value={fmt(r.torsion.combinedRatio, 3)} />
+          </tbody></table>
+          {r.torsion.isNegligible ? (
+            <div className="text-[9px] text-green-700 font-semibold pl-1">
+              ✓ T_u &lt; φ·T_th — torsi dapat diabaikan per ACI §22.7.4
+            </div>
+          ) : (
+            <table className="w-full mt-1"><tbody>
+              <CheckRow label="Rasio V+T ≤ 1.0" value={fmt(r.torsion.combinedRatio,3)}
+                limit="1.000" ok={r.torsion.isAdequate} />
+            </tbody></table>
+          )}
+        </>
+      )}
+
+      {/* Continuous beam secondary moments */}
+      {r.continuousBeam && r.continuousBeam.nSpans > 1 && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Balok Menerus — Momen Sekunder (TY Lin, Ch. 8)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="Jumlah bentang" value={`${r.continuousBeam.nSpans}`} />
+            <ResultRow label="M₁ primer midspan = Pe·e" value={fmt(r.continuousBeam.M1_midspan)} unit="kN·m" />
+            <ResultRow label="M₂ sekunder di tumpuan" value={fmt(r.continuousBeam.M2_support)} unit="kN·m" />
+            <ResultRow label="M_total tumpuan (M₁+M₂)" value={fmt(r.continuousBeam.M_total_support)} unit="kN·m" />
+            <ResultRow label="e_concordant di tumpuan" value={fmt(r.continuousBeam.e_concordant)} unit="mm" />
+            <ResultRow label="C-line shift = M₂/Pe" value={fmt(r.continuousBeam.cLineShift)} unit="mm" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 mt-0.5">
+            Tendon konkordant (e = {fmt(r.continuousBeam.e_concordant)} mm di tumpuan) tidak menghasilkan momen sekunder.
+            Pergeseran C-line = {fmt(r.continuousBeam.cLineShift)} mm ke arah {r.continuousBeam.cLineShift >= 0 ? "bawah" : "atas"}.
+          </div>
+        </>
+      )}
     </div>
   );
 }

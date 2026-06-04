@@ -15,6 +15,8 @@ import {
 import { computeTransferLength } from "@/engine/development";
 import { computeAnchorageZone } from "@/engine/anchorage";
 import { computeCrackWidth, crackedSectionSteel } from "@/engine/crackwidth";
+import { computeTorsion, estimateAcpPcp, estimateAohPh } from "@/engine/torsion";
+import { computeContinuousBeam } from "@/engine/continuous";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -85,6 +87,9 @@ const defaultLoads: LoadConfig = {
   gammaConc: 24,
   wSDL: 5, wLive: 20,
   relativeHumidity: 70,
+  tuTorsion: 0,
+  eTorsionArm: 1.5,
+  nSpans: 1,
 };
 
 const defaultImmediateLoss: ImmediateLossParams = {
@@ -298,6 +303,47 @@ function runPipeline(
     });
   }
 
+  // Torsion (only when Tu > 0)
+  let torsion;
+  if (loads.tuTorsion > 0) {
+    const bTotal = Math.max(girder.b1, girder.b3);
+    const { Acp, pcp } = estimateAcpPcp(bTotal, gross.hTotal);
+    const { Aoh, ph }  = estimateAohPh(girder.b2, gross.hTotal);
+    const fpc = (prestress.Pe * 1000) / gross.areaAg;
+    torsion = computeTorsion({
+      Tu: loads.tuTorsion,
+      Vu: VuShear,
+      bw: girder.b2,
+      dv,
+      Acp, pcp, Aoh, ph,
+      fc: material.fc,
+      fpc,
+      fyt: material.fys,
+      fyl: material.fy,
+      isPrestressed: true,
+      Vc: ulsShear.Vc,
+    });
+  }
+
+  // Continuous beam secondary moments
+  let continuousBeam;
+  const nSpans = loads.nSpans ?? 1;
+  if (nSpans > 1) {
+    continuousBeam = computeContinuousBeam({
+      nSpans: nSpans as 1 | 2 | 3,
+      L,
+      Pe: prestress.Pe,
+      eMidspan: eccentricityMidspan,
+      eSupport: tendon.eccentricitySupport,
+      eEnd: tendon.eccentricitySupport,
+    });
+  }
+
+  // Partial Prestress Ratio (PPR)
+  const PPR_val = ulsFlexure.fps > 0
+    ? (Aps * ulsFlexure.fps) / (Aps * ulsFlexure.fps + Math.max(material.As, 0) * material.fy)
+    : 1.0;
+
   return {
     results: Object.freeze({
       gross,
@@ -314,6 +360,9 @@ function runPipeline(
       transferLength,
       anchorageZone,
       crackWidth,
+      torsion,
+      continuousBeam,
+      PPR: PPR_val,
     }),
     errors: [],
   };

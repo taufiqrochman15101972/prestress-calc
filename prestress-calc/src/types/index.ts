@@ -97,6 +97,12 @@ export interface LoadConfig {
   wSDL: number;             // superimposed dead load (kN/m)
   wLive: number;            // live load (kN/m)
   relativeHumidity: number; // RH (%) for long-term losses
+  /** Factored torque at critical section (kN·m); 0 = no torsion check */
+  tuTorsion: number;
+  /** Torsion lever arm (m) — eccentricity of live load from shear centre */
+  eTorsionArm?: number;
+  /** Number of spans (1 = simply supported, 2 or 3 = continuous) */
+  nSpans?: 1 | 2 | 3;
 }
 
 export interface ImmediateLossParams {
@@ -342,6 +348,21 @@ export interface CrackWidthResult {
   readonly sMax_ACI318: number;
 }
 
+export interface ContinuousBeamResult {
+  /** Number of spans */
+  readonly nSpans: number;
+  /** Primary moment = Pe·e (kN·m) */
+  readonly M1_midspan: number;
+  /** Secondary moment from redundant reactions at interior support (kN·m) */
+  readonly M2_support: number;
+  /** Total hyperstatic moment at interior support (kN·m) */
+  readonly M_total_support: number;
+  /** Concordant tendon e at interior support (mm) — no secondary moments */
+  readonly e_concordant: number;
+  /** C-line shift at interior support = M2/Pe (mm) */
+  readonly cLineShift: number;
+}
+
 export interface DesignResults {
   readonly gross: GrossSectionProps;
   readonly composite: CompositeSectionProps;
@@ -356,6 +377,9 @@ export interface DesignResults {
   readonly loadBalance: LoadBalanceResult;
   readonly transferLength: TransferLengthResult;
   readonly anchorageZone: AnchorageZoneResult;
-  readonly torsion?: TorsionResult;       // only when Tu > 0
-  readonly crackWidth?: CrackWidthResult; // only for partial prestress
+  readonly torsion?: TorsionResult;
+  readonly crackWidth?: CrackWidthResult;
+  readonly continuousBeam?: ContinuousBeamResult;
+  /** Partial Prestress Ratio = Aps·fps / (Aps·fps + As·fy) */
+  readonly PPR?: number;
 }

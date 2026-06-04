@@ -4,6 +4,7 @@ import React, { useCallback } from "react";
 import { useDesignStore, resolveTendon } from "@/store/useDesignStore";
 import { GIRDER_PRESETS } from "@/lib/presets";
 import { girderHeight } from "@/engine/section";
+import { CloudModal } from "@/components/CloudModal";
 import type { TendonProfileType, ACIBeamClass } from "@/types";
 
 // ─── Primitive helpers ────────────────────────────────────────
@@ -76,6 +77,7 @@ export function InputPanel() {
 
   const { projectInfo, girder, deck, material, tendon, loads, immediateLoss, partialPrestress } = inputs;
   const [saveMsg, setSaveMsg] = React.useState("");
+  const [cloudOpen, setCloudOpen] = React.useState(false);
 
   const hTotal = girderHeight(girder);
   const h4 = girder.h4 ?? 0;
@@ -136,7 +138,7 @@ export function InputPanel() {
             </div>
           );
         })}
-        <div className="flex gap-1.5 pt-1">
+        <div className="flex gap-1 pt-1">
           <button
             onClick={() => { saveToLocal(); setSaveMsg("Tersimpan!"); setTimeout(() => setSaveMsg(""), 2000); }}
             className="flex-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1 transition-colors">
@@ -147,10 +149,17 @@ export function InputPanel() {
             className="flex-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-[10px] font-bold py-1 transition-colors">
             📂 Muat
           </button>
+          <button
+            onClick={() => setCloudOpen(true)}
+            className="flex-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold py-1 transition-colors"
+            title="Simpan/Muat dari Supabase cloud">
+            ☁ Cloud
+          </button>
         </div>
         {saveMsg && (
           <p className="text-center text-[10px] font-semibold text-green-700">{saveMsg}</p>
         )}
+        <CloudModal open={cloudOpen} onClose={() => setCloudOpen(false)} />
       </div>
 
       {/* ── Profil Girder & Geometri ── */}
@@ -393,6 +402,32 @@ export function InputPanel() {
           onChange={(v) => updateLoads({ wLive: v })} />
         <NumField label="RH Kelembapan" unit="%" value={loads.relativeHumidity} step={5}
           onChange={(v) => updateLoads({ relativeHumidity: v })} />
+        <NumField label="Tu Torsi" unit="kN·m" value={loads.tuTorsion} min={0} step={10}
+          onChange={(v) => updateLoads({ tuTorsion: v })} />
+      </div>
+
+      {/* ── Konfigurasi Bentang ── */}
+      <SectionBar>Konfigurasi Bentang</SectionBar>
+      <div className="px-3 py-2 space-y-2">
+        <div className="flex flex-col gap-0.5">
+          <Label>Jumlah Bentang</Label>
+          <select
+            value={loads.nSpans ?? 1}
+            onChange={(e) => updateLoads({ nSpans: parseInt(e.target.value) as 1|2|3 })}
+            className="rounded border border-gray-300 bg-white px-2 py-1 text-xs
+              focus:outline-none focus:ring-1 focus:ring-blue-400"
+          >
+            <option value={1}>1 Bentang (Gerber / Simply Supported)</option>
+            <option value={2}>2 Bentang Menerus (Continuous)</option>
+            <option value={3}>3 Bentang Menerus</option>
+          </select>
+        </div>
+        {(loads.nSpans ?? 1) > 1 && (
+          <div className="rounded bg-indigo-50 border border-indigo-200 p-2 text-[10px] text-indigo-700">
+            Momen sekunder akan dihitung otomatis dari eksentrisitas tendon.
+            Pastikan e_tumpuan diisi sesuai posisi tendon di tumpuan interior.
+          </div>
+        )}
       </div>
 
       {/* ── Kehilangan Seketika ── */}

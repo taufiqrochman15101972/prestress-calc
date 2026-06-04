@@ -147,7 +147,8 @@ export function openPrintReport(
     gross: g, composite: c, moments: m, prestress: p, tdLosses: td,
     sls, ulsFlexure: uf, ulsShear: us, deflection: defl,
     interfaceShear: ish, loadBalance: lb, transferLength: tl,
-    anchorageZone: az, crackWidth: cw,
+    anchorageZone: az, crackWidth: cw, torsion: tor,
+    continuousBeam: cb, PPR,
   } = results;
 
   const h4 = girder.h4 ?? 0;
@@ -537,7 +538,76 @@ ${section("15. Zona Angkur — Bursting & Spalling (AASHTO LRFD §5.10.9.3)", tw
   </div>`
 ))}
 
-${cw ? section("16. Lebar Retak — Prategang Sebagian (ACI 224R-01 Gergely-Lutz)", twoCol(
+${PPR !== undefined ? section("16. Partial Prestress Ratio (PPR)", `
+  ${twoCol(
+    table(
+      row("PPR = A_ps·f_ps / (A_ps·f_ps + A_s·f_y)", `${n(PPR * 100, 1)}`, "%") +
+      row("A_ps", mm2(tendon.rows.reduce((s,r)=>s+r.strandCount,0)*tendon.singleStrandArea)) +
+      row("f_ps (ULS)", MPa(uf.fps)) +
+      row("A_s tulangan mild", mm2(material.As)) +
+      row("f_y tulangan mild", MPa(material.fy))
+    ),
+    `<div class="info-box">
+      <strong>Interpretasi PPR:</strong><br>
+      PPR = 1.0 → prategang penuh (pure prestressed)<br>
+      PPR = 0.0 → beton bertulang biasa (no prestress)<br>
+      0 &lt; PPR &lt; 1 → prategang sebagian (partially prestressed)<br><br>
+      <strong>Nilai PPR = ${n(PPR*100,1)}%</strong><br>
+      ${PPR >= 0.99 ? "Prategang penuh — semua tarik ditumpu oleh strand." : `Prategang sebagian — ${n((1-PPR)*100,1)}% kapasitas lentur dari tulangan mild A_s.`}
+    </div>`
+  )}
+`) : ""}
+
+${tor ? section("17. Kontrol Torsi (ACI 318-19 §22.7)", `
+  <div style="color:${tor.isAdequate||tor.isNegligible?"#15803d":"#dc2626"};font-weight:700;margin-bottom:4px">
+    ${tor.isNegligible ? "✓ TORSI DIABAIKAN (T_u < φ·T_th)" : tor.isAdequate ? "✓ PENAMPANG AMAN TERHADAP TORSI+GESER" : "✗ PENAMPANG TIDAK CUKUP"}
+  </div>
+  ${twoCol(
+    table(
+      row("T_u terfaktor", kNm(loads.tuTorsion)) +
+      row("T_th (ambang = φ·T_th)", kNm(tor.T_th)) +
+      row("T_cr (momen retak)", kNm(tor.T_cr)) +
+      row("θ strut angle", `${n(tor.theta_deg,1)}`, "°") +
+      row("Ao ≈ 0.85·Aoh", `${n(tor.Ao,0)}`, "mm²")
+    ),
+    table(
+      row("At/s (transversal per kaki)", tor.isNegligible ? "—" : `${n(tor.At_per_s,4)}`, "mm²/mm") +
+      row("Al (longitudinal torsion)", tor.isNegligible ? "—" : mm2(tor.Al_req)) +
+      row("Rasio V+T gabungan", n(tor.combinedRatio, 3))
+    )
+  )}
+  ${!tor.isNegligible ? `<div class="check-row ${tor.isAdequate?"":"fail"}">
+    <span class="check-label">Rasio gabungan (V+T)² ≤ (Vc/bw·dv + 0.66√f'c)²</span>
+    <span class="check-value">${n(tor.combinedRatio,3)} ≤ 1.000</span>
+    <span>${check(tor.isAdequate)}</span>
+  </div>` : `<div class="note-box">T_u = ${kNm(loads.tuTorsion)} &lt; φ·T_th = ${kNm(0.75*tor.T_th)} — torsi diabaikan per ACI §22.7.4.1.</div>`}
+`) : ""}
+
+${cb && cb.nSpans > 1 ? section(`18. Balok Menerus ${cb.nSpans} Bentang — Momen Sekunder (TY Lin Ch. 8)`, `
+  <div class="info-box" style="margin-bottom:5px">
+    Metode beban setara (equivalent load method): tendon menimbulkan reaksi di tumpuan interior.
+    Reaksi redundan ini menghasilkan momen sekunder M₂ yang harus dijumlahkan dengan momen primer M₁ = Pe·e.
+  </div>
+  ${twoCol(
+    table(
+      row("Jumlah bentang", `${cb.nSpans}`) +
+      row("M₁ primer midspan = Pe·e", kNm(cb.M1_midspan)) +
+      row("M₂ sekunder tumpuan interior", kNm(cb.M2_support)) +
+      row("M_total = M₁ + M₂ (tumpuan)", kNm(cb.M_total_support)) +
+      row("e_concordant di tumpuan", mm(cb.e_concordant)) +
+      row("C-line shift = M₂/Pe", mm(cb.cLineShift))
+    ),
+    `<div class="note-box">
+      <strong>Tendon Konkordant</strong> (tidak ada momen sekunder):<br>
+      e di tumpuan interior = M_total/Pe = <strong>${n(cb.e_concordant,1)} mm</strong><br><br>
+      <strong>C-line (Pressure Line)</strong>:<br>
+      Bergeser ${n(Math.abs(cb.cLineShift),1)} mm ke ${cb.cLineShift>=0?"bawah":"atas"} dari c.g. tendon di tumpuan.<br><br>
+      Untuk desain ULS: gunakan M_total pada kombinasi momen = M₁ + M₂.
+    </div>`
+  )}
+`) : ""}
+
+${cw ? section("Lebar Retak — Prategang Sebagian (ACI 224R-01 Gergely-Lutz)", twoCol(
   `<div class="sub-title">Hasil Perhitungan Lebar Retak</div>` +
   table(
     row("Kelas balok ACI", sls.beamClass === "T" ? "Class T (Transisi)" : "Class C (Retak)") +
