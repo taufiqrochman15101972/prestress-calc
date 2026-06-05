@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { calculateGrossProperties, calculateCompositeProperties } from "@/engine/section";
 import { tendonProfile, computePrestressForces } from "@/engine/tendon";
-import { computeTimeDependentLosses } from "@/engine/losses";
+import { computeTimeDependentLosses, computeLumpSumLosses } from "@/engine/losses";
 import { computeSLSChecks } from "@/engine/sls";
 import {
   computeFlexuralStrength,
@@ -11,12 +11,15 @@ import {
   computeShearStrength,
   computeInterfaceShear,
   computeLoadBalance,
+  checkDuctility,
 } from "@/engine/uls";
 import { computeTransferLength } from "@/engine/development";
 import { computeAnchorageZone } from "@/engine/anchorage";
 import { computeCrackWidth, crackedSectionSteel } from "@/engine/crackwidth";
 import { computeTorsion, estimateAcpPcp, estimateAohPh } from "@/engine/torsion";
-import { computeContinuousBeam } from "@/engine/continuous";
+import { computeContinuousBeam, computeMomentRedistribution } from "@/engine/continuous";
+import { computeFlexuralStages } from "@/engine/flexuralstages";
+import { computeMCFT } from "@/engine/mcft";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -46,10 +49,14 @@ const defaultProjectInfo: ProjectInfo = {
   lokasi: "",
 };
 
+// Realistic popular I-girder with trapezoidal (filleted) top & bottom flanges
+// — a plain rectangular-flange I is rare in practice (Nilson §4.4 standard shapes).
+// Top/bottom transition fillets (h5/h4) give the tension & compression flanges
+// their characteristic trapezium shape. H = 180+150+950+200+200 = 1680 mm.
 const defaultGirder: IGirderGeometry = {
-  b1: 600, h1: 200, h5: 0,
-  b2: 200, h2: 1200, h4: 0,
-  b3: 700, h3: 250,
+  b1: 600, h1: 180, h5: 150,
+  b2: 200, h2: 950, h4: 200,
+  b3: 700, h3: 200,
 };
 
 const defaultDeck: DeckGeometry = {
@@ -339,6 +346,41 @@ function runPipeline(
     });
   }
 
+  // Flexural load stages & changes in prestress force (Nilson §1.7/§3.6)
+  const n_modular = material.Eps / Ec;
+  const flexuralStages = computeFlexuralStages({
+    Pe: prestress.Pe, fse, e: eccentricityMidspan, Aps,
+    A: gross.areaAg, I: gross.momentOfInertiaIg, Zb: gross.Zbg,
+    kt: gross.kt, Mdead: Mg, fr, n: n_modular, fps: ulsFlexure.fps,
+  });
+
+  // Compression Field Theory shear (Nilson §5.11 / AASHTO general method)
+  const mcftShear = computeMCFT({
+    Vu: VuShear, Mu, Nu: 0, Vp: ulsShear.Vp,
+    fc: material.fc, bv: bw, dv,
+    Aps, As: material.As, fpu: tendon.fpu, Ep: material.Eps,
+    fyt: material.fys, AvPerS: ulsShear.AvPerS,
+  });
+
+  // Moment redistribution for continuous members (Nilson §8.10)
+  let momentRedistribution;
+  if (continuousBeam && continuousBeam.nSpans > 1) {
+    const hCompMr = gross.hTotal + deck.thicknessTd;
+    const dpMr = hCompMr - (gross.yb - eccentricityMidspan);
+    const ductMr = checkDuctility(ulsFlexure.c, dpMr);
+    momentRedistribution = computeMomentRedistribution({
+      M_support_elastic: Math.abs(continuousBeam.M_total_support) || Mu,
+      M_midspan_elastic: ulsFlexure.Mu,
+      epsilon_t: ductMr.epsilon_t,
+    });
+  }
+
+  // Lump-sum loss estimate (Nilson §6.2) — cross-check of refined method
+  const fpi_lump = prestress.jackingStressMpa - prestress.deltaFR - prestress.deltaAS - prestress.deltaES;
+  const lumpSumLosses = computeLumpSumLosses(
+    fpi_lump, Aps, gross.areaAg, material.fci, loads.relativeHumidity
+  );
+
   // Partial Prestress Ratio (PPR)
   const PPR_val = ulsFlexure.fps > 0
     ? (Aps * ulsFlexure.fps) / (Aps * ulsFlexure.fps + Math.max(material.As, 0) * material.fy)
@@ -362,6 +404,10 @@ function runPipeline(
       crackWidth,
       torsion,
       continuousBeam,
+      flexuralStages,
+      mcftShear,
+      momentRedistribution,
+      lumpSumLosses,
       PPR: PPR_val,
     }),
     errors: [],

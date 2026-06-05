@@ -109,6 +109,16 @@ export function calculateGrossProperties(g: IGirderGeometry): GrossSectionProps 
     return sum + localI[i] + areas[i] * d * d;
   }, 0);
 
+  const r2 = momentOfInertiaIg / areaAg;
+  // ── Kern points & flexural efficiency (Nilson §4.3) ──────────
+  // Upper kern kt = r²/yb : prestress applied here → zero stress at bottom fiber
+  // Lower kern kb = r²/yt : prestress applied here → zero stress at top fiber
+  // Efficiency ρ = r²/(yt·yb) = kt·kb/(yt·yb)... actually ρ = r²/(yt·yb).
+  //   ρ→1 for ideal I; ρ≈0.33 rectangle; higher ρ = material used efficiently.
+  const kt = r2 / yb;
+  const kb = r2 / yt;
+  const efficiency = r2 / (yt * yb);
+
   return Object.freeze({
     areaAg,
     yb,
@@ -117,7 +127,10 @@ export function calculateGrossProperties(g: IGirderGeometry): GrossSectionProps 
     Ztg: momentOfInertiaIg / yt,
     Zbg: momentOfInertiaIg / yb,
     hTotal,
-    r2: momentOfInertiaIg / areaAg,
+    r2,
+    kt,
+    kb,
+    efficiency,
   });
 }
 

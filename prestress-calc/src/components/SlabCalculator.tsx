@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computePTSlab } from "@/engine/slab";
+import { computePTSlab, computeSlabMomentTransfer } from "@/engine/slab";
 import type { PTSlabInputs } from "@/engine/slab";
 
 const DEFAULT: PTSlabInputs = {
@@ -53,7 +53,11 @@ export function SlabCalculator() {
   const set = (k: keyof PTSlabInputs, v: number) =>
     setInp(prev => ({ ...prev, [k]: v }));
 
+  const [Munb, setMunb] = useState(80); // kN·m unbalanced moment to column
   const res = useMemo(() => computePTSlab(inp), [inp]);
+  const mt = useMemo(() => computeSlabMomentTransfer({
+    Vu: res.Vu_punch, M_unb: Munb, cx: inp.cx, cy: inp.cy, t: inp.t, fc: inp.fc,
+  }), [res.Vu_punch, Munb, inp.cx, inp.cy, inp.t, inp.fc]);
   const f = (v: number, d = 2) => v.toFixed(d);
 
   return (
@@ -149,6 +153,32 @@ export function SlabCalculator() {
           <p className="font-bold text-indigo-800">Detail Geser Pons (ACI §22.6)</p>
           <p>bo (keliling kritis) = {f(res.bo,0)} mm &nbsp;·&nbsp; Vu = {f(res.Vu_punch,1)} kN</p>
           <p>Vc = {f(res.Vc_punch,1)} kN &nbsp;·&nbsp; φVc = {f(res.phiVc_punch,1)} kN (φ=0.75)</p>
+        </div>
+
+        {/* Moment transfer at column (Nilson §10.15, ACI §8.4.2.3) */}
+        <div>
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-[9px] font-bold text-gray-500 uppercase">Transfer Momen di Kolom (Nilson §10.15)</p>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-gray-500">M_unb</span>
+              <input type="number" value={Munb} step={10}
+                onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setMunb(v); }}
+                className="w-16 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <span className="text-[9px] text-gray-400">kN·m</span>
+            </div>
+          </div>
+          <table className="w-full"><tbody>
+            <Row label="γ_f (lentur) = 1/(1+⅔√(b1/b2))" value={f(mt.gamma_f,3)} />
+            <Row label="γ_v (geser eksentris) = 1−γ_f" value={f(mt.gamma_v,3)} />
+            <Row label="M_f pita lentur = γ_f·M_unb" value={f(mt.Mf_band,1)} unit="kN·m" />
+            <Row label="v_u langsung = Vu/(bo·d)" value={f(mt.vu_direct,3)} unit="MPa" />
+            <Row label="v_u momen = γ_v·M·c/Jc" value={f(mt.vu_moment,3)} unit="MPa" />
+            <Row label="v_u gabungan" value={f(mt.vu_combined,3)} unit="MPa" />
+          </tbody></table>
+          <div className="mt-0.5">
+            <Chk label="Geser gabungan v_u ≤ φv_c"
+              value={`${f(mt.vu_combined,3)}`} limit={`${f(mt.phi_vc,3)} MPa`} ok={mt.isOk} />
+          </div>
         </div>
 
         {/* Visualization: schematic plan */}

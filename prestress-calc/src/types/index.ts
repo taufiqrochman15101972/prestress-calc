@@ -154,6 +154,12 @@ export interface GrossSectionProps {
   readonly hTotal: number;
   /** Radius of gyration squared: r² = Ig/Ag (mm²) */
   readonly r2: number;
+  /** Upper kern distance kt = r²/yb (mm) — Nilson §4.3 */
+  readonly kt: number;
+  /** Lower kern distance kb = r²/yt (mm) — Nilson §4.3 */
+  readonly kb: number;
+  /** Flexural efficiency factor ρ = r²/(yt·yb) — Nilson §4.3 (0–1, higher = better) */
+  readonly efficiency: number;
 }
 
 export interface CompositeSectionProps {
@@ -380,6 +386,14 @@ export interface DesignResults {
   readonly torsion?: TorsionResult;
   readonly crackWidth?: CrackWidthResult;
   readonly continuousBeam?: ContinuousBeamResult;
+  /** Flexural load stages & changes in prestress force (Nilson §1.7/§3.6) */
+  readonly flexuralStages?: import("@/engine/flexuralstages").FlexuralStageResult;
+  /** Compression Field Theory shear (Nilson §5.11 / AASHTO general) */
+  readonly mcftShear?: import("@/engine/mcft").MCFTResult;
+  /** Moment redistribution for continuous members (Nilson §8.10) */
+  readonly momentRedistribution?: import("@/engine/continuous").MomentRedistributionResult;
+  /** Lump-sum loss estimate (Nilson §6.2) — cross-check of refined losses */
+  readonly lumpSumLosses?: import("@/engine/losses").LumpSumLossResult;
   /** Partial Prestress Ratio = Aps·fps / (Aps·fps + As·fy) */
   readonly PPR?: number;
 }

@@ -21,6 +21,10 @@
  *  18 Balok Menerus (kondisional)
  *  19 Daktilitas — εt ACI §21.2
  *  20 Kelelahan (Fatigue) — Δfps ACI §26.12
+ *  21 Tahapan Lentur & Perubahan Gaya Prategang (Nilson §1.7/§3.6)
+ *  22 Geser Metode Umum / Compression Field Theory (Nilson §5.11)
+ *  23 Redistribusi Momen (Nilson §8.10) — kondisional menerus
+ *  24 Estimasi Kehilangan Lump-Sum (Nilson §6.2) — pembanding
  *     Lebar Retak (ACI 224R) — hanya jika partial prestress
  */
 import type { ProjectInputs, DesignResults, AppSettings } from "@/types";
@@ -155,6 +159,8 @@ export function openPrintReport(
     interfaceShear: ish, loadBalance: lb, transferLength: tl,
     anchorageZone: az, crackWidth: cw, torsion: tor,
     continuousBeam: cb, PPR,
+    flexuralStages: fst, mcftShear: mcft,
+    momentRedistribution: mrd, lumpSumLosses: lsl,
   } = results;
 
   const h4 = girder.h4 ?? 0;
@@ -266,7 +272,10 @@ ${twoCol(
     row("I_g", sci(g.momentOfInertiaIg, 11), "mm⁴") +
     row("Z_tg = I_g/y_t", sci(g.Ztg, 6), "mm³") +
     row("Z_bg = I_g/y_b", sci(g.Zbg, 6), "mm³") +
-    row("r² = I_g/A_g", `${n(g.r2,1)}`, "mm²")
+    row("r² = I_g/A_g", `${n(g.r2,1)}`, "mm²") +
+    row("k_t (kern atas = r²/y_b)", mm(g.kt)) +
+    row("k_b (kern bawah = r²/y_t)", mm(g.kb)) +
+    row("ρ efisiensi = r²/(y_t·y_b)", n(g.efficiency, 3))
   )),
   section("4. Penampang Komposit (Transformasi)", table(
     row("n_c = E_deck/E_girder", n(c.modularRatioNc, 4)) +
@@ -681,6 +690,102 @@ ${(() => {
   )}
 `);
 })()}
+
+${fst ? section("21. Tahapan Lentur & Perubahan Gaya Prategang (Nilson §1.7 / §3.6)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Seiring momen luar bertambah, balok melewati tahap: dekompresi (serat bawah → 0),
+    retak (serat bawah → +f_r), lalu ultimit. Tegangan strand naik perlahan hingga retak
+    kemudian cepat — kenaikan total Δf_p yang kecil menandakan penampang efisien.
+  </div>
+  ${twoCol(
+    table(
+      row("M_dekompresi (tambahan di atas beban mati)", kNm(fst.M_dec)) +
+      row("M_dekompresi total (dari nol)", kNm(fst.M_dec_total)) +
+      row("M_cr retak", kNm(fst.M_cr)) +
+      row("σ beton di level strand (f_ce)", MPa(fst.f_ce))
+    ),
+    table(
+      row("f_se efektif", MPa(fst.fse)) +
+      row("f_p saat dekompresi beton", MPa(fst.fp_dec)) +
+      row("f_ps ultimit", MPa(fst.fps)) +
+      row("Δf_p total = f_ps − f_se", MPa(fst.delta_fp_total)) +
+      row("Rasio kenaikan Δf_p/f_ps", `${n(fst.stress_rise_ratio*100,1)}`, "%")
+    )
+  )}
+`) : ""}
+
+${mcft ? section("22. Geser — Metode Umum / Compression Field Theory (Nilson §5.11, AASHTO §5.7.3)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Alternatif sectional dari Vci/Vcw: web retak diperlakukan sebagai truss sudut-variabel.
+    β dan θ diturunkan dari regangan longitudinal ε_x di tengah tinggi (f_po = 0.70·f_pu).
+  </div>
+  ${twoCol(
+    table(
+      row("ε_x regangan longitudinal", `${n(mcft.epsilon_x*1000,3)}`, "×10⁻³") +
+      row("β faktor tarik beton", n(mcft.beta,2)) +
+      row("θ sudut retak diagonal", `${n(mcft.theta_deg,1)}`, "°") +
+      row("f_po = 0.70·f_pu", MPa(mcft.fpo))
+    ),
+    table(
+      row("V_c = 0.083·β·√f'c·bv·dv", kN(mcft.Vc)) +
+      row("V_s (cot θ)", kN(mcft.Vs)) +
+      row("V_n = Vc+Vs+Vp", kN(mcft.Vn)) +
+      row("A_v/s diperlukan (MCFT)", `${n(mcft.AvPerS_req,4)}`, "mm²/mm")
+    )
+  )}
+  <div class="check-row ${mcft.isAdequate?"":"fail"}">
+    <span class="check-label">φV_n ≥ V_u (φ=0.75)</span>
+    <span class="check-value">${kN(mcft.phiVn)} ≥ ${kN(us.Vu)}</span>
+    <span>${check(mcft.isAdequate)}</span>
+  </div>
+  <div class="check-row ${mcft.Vn <= mcft.Vn_max?"":"fail"}">
+    <span class="check-label">V_n ≤ V_n,max = 0.25f'c·bv·dv + Vp</span>
+    <span class="check-value">${kN(mcft.Vn)} ≤ ${kN(mcft.Vn_max)}</span>
+    <span>${check(mcft.Vn <= mcft.Vn_max)}</span>
+  </div>
+`) : ""}
+
+${mrd ? section("23. Redistribusi Momen — Analisis Batas (Nilson §8.10, ACI §6.6.5)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Momen tumpuan (negatif) elastis boleh diredistribusi sebesar 1000·ε_t (maks 20%),
+    hanya jika ε_t ≥ 0.0075. Momen bentang bertambah untuk menjaga keseimbangan statika.
+  </div>
+  ${twoCol(
+    table(
+      row("Redistribusi diizinkan (ε_t ≥ 0.0075)", mrd.isPermitted ? "Ya" : "Tidak") +
+      row("Persentase redistribusi", `${n(mrd.redistribPct,1)}`, "%") +
+      row("ΔM yang digeser", kNm(mrd.deltaM))
+    ),
+    table(
+      row("M tumpuan elastis → terdistribusi", kNm(mrd.M_support_adj)) +
+      row("M bentang elastis → terdistribusi", kNm(mrd.M_midspan_adj))
+    )
+  )}
+`) : ""}
+
+${lsl ? section("24. Estimasi Kehilangan Lump-Sum (Nilson §6.2, AASHTO §5.9.3.3) — Pembanding", `
+  <div class="info-box" style="margin-bottom:5px">
+    Metode pendekatan cepat sebagai pembanding terhadap metode refined (Bagian 6).
+    Δf_pLT = 10·(f_pi·A_ps/A_g)·γ_h·γ_st + 12·γ_h·γ_st + Δf_pR.
+  </div>
+  ${twoCol(
+    table(
+      row("γ_h = 1.7 − 0.01·H", n(lsl.gamma_h,3)) +
+      row("γ_st = 35/(7+f'ci)", n(lsl.gamma_st,3))
+    ),
+    table(
+      row("Δf_p creep+shrink", MPa(lsl.deltaFp_creepShrink)) +
+      row("Δf_pR relaksasi", MPa(lsl.deltaFp_relax)) +
+      row("Δf_pLT lump-sum total", MPa(lsl.deltaFpLT)) +
+      row("Δf_pLT refined (Bagian 6)", MPa(td.deltaFpLT))
+    )
+  )}
+  <div class="note-box" style="margin-top:4px">
+    Selisih lump-sum vs refined: ${n(Math.abs(lsl.deltaFpLT - td.deltaFpLT),1)} MPa
+    (${n(Math.abs(lsl.deltaFpLT - td.deltaFpLT)/Math.max(td.deltaFpLT,1)*100,1)}%).
+    Refined dianjurkan untuk desain akhir.
+  </div>
+`) : ""}
 
 ${cw ? section("Lebar Retak — Prategang Sebagian (ACI 224R-01 Gergely-Lutz)", twoCol(
   `<div class="sub-title">Hasil Perhitungan Lebar Retak</div>` +

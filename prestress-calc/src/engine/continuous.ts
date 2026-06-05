@@ -121,3 +121,58 @@ export function computeContinuousBeam(inp: ContinuousBeamInputs): ContinuousBeam
     cLineShift,
   });
 }
+
+// ─── Moment Redistribution & Limit Analysis ──────────────────
+// Nilson §8.10; ACI 318-19 §6.6.5
+//
+// Continuous prestressed members with adequate ductility may have
+// their elastic support (negative) moments redistributed:
+//   redistribution % = 1000·εt   (≤ 20 %),  permitted only if εt ≥ 0.0075
+// The negative moment is reduced; the span (positive) moment grows to
+// keep equilibrium. The redistributed set must still satisfy statics.
+
+export interface MomentRedistributionInputs {
+  /** Elastic factored negative moment at interior support (kN·m, magnitude) */
+  M_support_elastic: number;
+  /** Elastic factored positive moment at midspan (kN·m) */
+  M_midspan_elastic: number;
+  /** Net tensile strain εt at the support section (from ductility check) */
+  epsilon_t: number;
+}
+
+export interface MomentRedistributionResult {
+  /** Permitted redistribution percentage (0–20) */
+  readonly redistribPct: number;
+  /** Is redistribution permitted (εt ≥ 0.0075)? */
+  readonly isPermitted: boolean;
+  /** Moment shifted off the support (kN·m) */
+  readonly deltaM: number;
+  /** Redistributed support moment (kN·m) */
+  readonly M_support_adj: number;
+  /** Redistributed midspan moment (kN·m) */
+  readonly M_midspan_adj: number;
+}
+
+export function computeMomentRedistribution(
+  inp: MomentRedistributionInputs
+): MomentRedistributionResult {
+  const { M_support_elastic, M_midspan_elastic, epsilon_t } = inp;
+
+  const isPermitted = epsilon_t >= 0.0075;
+  const redistribPct = isPermitted
+    ? Math.min(1000 * epsilon_t, 20)
+    : 0;
+
+  const deltaM = M_support_elastic * (redistribPct / 100);
+  const M_support_adj = M_support_elastic - deltaM;
+  // Span moment increases by roughly half the support reduction (symmetric span)
+  const M_midspan_adj = M_midspan_elastic + deltaM / 2;
+
+  return Object.freeze({
+    redistribPct,
+    isPermitted,
+    deltaM,
+    M_support_adj,
+    M_midspan_adj,
+  });
+}

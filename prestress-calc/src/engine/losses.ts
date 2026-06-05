@@ -200,3 +200,43 @@ export function computeTimeDependentLosses(
 
   return Object.freeze({ deltaFpSR, deltaFpCR, deltaFpR2, deltaFpLT, effectivePe });
 }
+
+// ─── Lump-Sum / Approximate Loss Estimate ────────────────────
+// Nilson §6.2; AASHTO LRFD §5.9.3.3 (Approximate Estimate of
+// Time-Dependent Losses). A quick alternative to the refined
+// method above, useful as a sanity check.
+//
+//   ΔfpLT = 10·(fpi·Aps/Ag)·γh·γst + 12·γh·γst + ΔfpR
+//   γh = 1.7 − 0.01·H            (humidity factor)
+//   γst = 35 / (7 + f'ci)        (strength factor)
+//   ΔfpR ≈ 16.5 MPa             (relaxation, low-relax strand)
+
+export interface LumpSumLossResult {
+  readonly gamma_h: number;
+  readonly gamma_st: number;
+  readonly deltaFp_creepShrink: number; // first two terms combined (MPa)
+  readonly deltaFp_relax: number;       // ΔfpR (MPa)
+  readonly deltaFpLT: number;           // total long-term lump-sum (MPa)
+}
+
+export function computeLumpSumLosses(
+  fpi: number,    // stress in strand immediately before transfer (MPa)
+  Aps: number,    // mm²
+  Ag: number,     // gross area mm²
+  fci: number,    // f'ci (MPa)
+  RH: number      // relative humidity (%)
+): LumpSumLossResult {
+  const gamma_h = 1.7 - 0.01 * RH;
+  const gamma_st = 35 / (7 + fci);
+  const term1 = 10 * ((fpi * Aps) / Ag) * gamma_h * gamma_st;
+  const term2 = 12 * gamma_h * gamma_st;
+  const deltaFp_relax = 16.5; // MPa, low-relaxation strand
+  const deltaFp_creepShrink = term1 + term2;
+  return Object.freeze({
+    gamma_h,
+    gamma_st,
+    deltaFp_creepShrink,
+    deltaFp_relax,
+    deltaFpLT: deltaFp_creepShrink + deltaFp_relax,
+  });
+}

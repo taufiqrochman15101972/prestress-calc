@@ -195,3 +195,88 @@ export function computePTSlab(inp: PTSlabInputs): PTSlabResult {
     delta_unbal, limitDefl, isDeflOk,
   });
 }
+
+// ─── Transfer of Moments at Slab-Column Connection ───────────
+// Nilson §10.15; ACI 318-19 §8.4.2.3 & §8.4.4.2
+//
+// An unbalanced moment M_unb at an interior column is split:
+//   γf·M_unb  resisted by flexure over a band (c2 + 3h)
+//   γv·M_unb  resisted by eccentric shear → adds to direct vu
+//
+//   γf = 1 / (1 + (2/3)·√(b1/b2))      γv = 1 − γf
+//   v_u = Vu/(bo·d) + γv·M_unb·c_AB / Jc
+//   Jc  = d·b1³/6 + b1·d³/6 + d·b2·b1²/2   (interior column, two-sided)
+//   c_AB = b1/2
+// where b1 = critical-section dim ∥ to the span being analysed (cx + d),
+//       b2 = critical-section dim ⊥ (cy + d).
+
+export interface SlabMomentTransferInputs {
+  /** Direct factored punching shear Vu (kN) */
+  Vu: number;
+  /** Unbalanced moment transferred to the column M_unb (kN·m) */
+  M_unb: number;
+  /** Column dimension parallel to analysed span cx (mm) */
+  cx: number;
+  /** Column dimension perpendicular cy (mm) */
+  cy: number;
+  /** Slab thickness t (mm) */
+  t: number;
+  /** f'c (MPa) */
+  fc: number;
+}
+
+export interface SlabMomentTransferResult {
+  readonly gamma_f: number;       // flexural fraction
+  readonly gamma_v: number;       // eccentric-shear fraction
+  readonly b1: number;            // mm (critical-section dim ∥ span)
+  readonly b2: number;            // mm
+  readonly bo: number;            // perimeter (mm)
+  readonly Jc: number;            // polar moment of critical section (mm⁴)
+  readonly c_AB: number;          // distance to critical face (mm)
+  readonly Mf_band: number;       // moment to resist by flexure γf·M_unb (kN·m)
+  readonly vu_direct: number;     // MPa — Vu/(bo·d)
+  readonly vu_moment: number;     // MPa — γv·M·c/Jc
+  readonly vu_combined: number;   // MPa — total
+  readonly phi_vc: number;        // MPa — φ·vc allowable stress
+  readonly isOk: boolean;
+}
+
+export function computeSlabMomentTransfer(
+  inp: SlabMomentTransferInputs
+): SlabMomentTransferResult {
+  const { Vu, M_unb, cx, cy, t, fc } = inp;
+
+  const d = 0.8 * t;                 // effective depth (mm)
+  const b1 = cx + d;                 // ∥ to analysed span
+  const b2 = cy + d;                 // ⊥
+  const bo = 2 * (b1 + b2);
+
+  const gamma_f = 1 / (1 + (2 / 3) * Math.sqrt(b1 / b2));
+  const gamma_v = 1 - gamma_f;
+
+  // Polar moment of inertia of the critical section (interior column)
+  const Jc = (d * b1 ** 3) / 6 + (b1 * d ** 3) / 6 + (d * b2 * b1 ** 2) / 2;
+  const c_AB = b1 / 2;
+
+  // Shear stresses (MPa); M_unb kN·m → N·mm
+  const M_Nmm = M_unb * 1e6;
+  const vu_direct = (Vu * 1000) / (bo * d);
+  const vu_moment = (gamma_v * M_Nmm * c_AB) / Jc;
+  const vu_combined = vu_direct + vu_moment;
+
+  // Allowable two-way shear stress = min of three ACI eqs / (already a stress)
+  const beta_c = Math.max(cx, cy) / Math.min(cx, cy);
+  const alpha_s = 40;
+  const vc1 = 0.17 * (1 + 2 / beta_c) * Math.sqrt(fc);
+  const vc2 = 0.083 * (alpha_s * d / bo + 2) * Math.sqrt(fc);
+  const vc3 = 0.33 * Math.sqrt(fc);
+  const phi_vc = 0.75 * Math.min(vc1, vc2, vc3);
+
+  return Object.freeze({
+    gamma_f, gamma_v, b1, b2, bo, Jc, c_AB,
+    Mf_band: gamma_f * M_unb,
+    vu_direct, vu_moment, vu_combined,
+    phi_vc,
+    isOk: vu_combined <= phi_vc,
+  });
+}

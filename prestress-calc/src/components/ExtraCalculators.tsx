@@ -5,8 +5,10 @@ import { PileCalculator } from "@/components/PileCalculator";
 import { ColumnCalculator } from "@/components/ColumnCalculator";
 import { SlabCalculator } from "@/components/SlabCalculator";
 import { TankCalculator } from "@/components/TankCalculator";
+import { TensionCalculator } from "@/components/TensionCalculator";
+import { CorbelCalculator } from "@/components/CorbelCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel";
 
 interface Props {
   open: boolean;
@@ -38,6 +40,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Tangki/Pipa Prategang Sirkuler",
     subtitle: "Prategang melingkar — tegangan hoop, tekanan cairan, ACI 350",
   },
+  {
+    key: "tension",
+    emoji: "🔗",
+    title: "Batang Tarik Prategang",
+    subtitle: "Tension tie — N_dec, N_cr, kekakuan retak, kapasitas (Nilson §11.7)",
+  },
+  {
+    key: "corbel",
+    emoji: "📐",
+    title: "Konsol Pendek / Korbel",
+    subtitle: "Bracket & corbel — geser-friksi, Asc, Ah (Nilson §12.5, ACI §16.5)",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -60,7 +74,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
               Kalkulator Tambahan — PRESTRESS-CALC
             </h2>
             <p className="text-[10px] text-blue-200">
-              TY Lin Ch. 9 (Pelat) · Ch. 10 (Tiang) · Ch. 11 (Kolom)
+              TY Lin Ch. 9–11 · Nilson §11 (Batang Tarik) · §12.5 (Korbel)
             </p>
           </div>
           <button onClick={onClose}
@@ -92,14 +106,18 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "column" && "TY Lin & Burns, Ch. 11 — Compression Members · ACI 318-19 §22.4 — P-M Interaction Diagram · SNI 2847:2019"}
           {tab === "slab" && "TY Lin & Burns, Ch. 9 — Two-Way Slabs · ACI 318-19 §8.10 — Equivalent Frame · PTI DC20.9 Post-Tensioned Slab Design"}
           {tab === "tank" && "TY Lin & Burns, Ch. 10 — Circular Prestressing · ACI 350-20 Liquid-Retaining Structures · AWWA D110"}
+          {tab === "tension" && "Nilson, Design of Prestressed Concrete 2nd Ed. §11.7–11.10 — Tension Members · ACI 318-19 §20.3"}
+          {tab === "corbel" && "Nilson §12.4–12.5 — Brackets & Corbels · ACI 318-19 §16.5 — Shear-Friction Method"}
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {tab === "pile"   && <PileCalculator />}
-          {tab === "column" && <ColumnCalculator />}
-          {tab === "slab"   && <SlabCalculator />}
-          {tab === "tank"   && <TankCalculator />}
+          {tab === "pile"    && <PileCalculator />}
+          {tab === "column"  && <ColumnCalculator />}
+          {tab === "slab"    && <SlabCalculator />}
+          {tab === "tank"    && <TankCalculator />}
+          {tab === "tension" && <TensionCalculator />}
+          {tab === "corbel"  && <CorbelCalculator />}
         </div>
 
         {/* Footer */}

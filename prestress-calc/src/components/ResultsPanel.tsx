@@ -60,6 +60,16 @@ function SectionTab({ r }: { r: DesignResults }) {
         <ResultRow label="Z_tg" value={`${(g.Ztg/1e6).toFixed(3)}×10⁶`} unit="mm³" />
         <ResultRow label="Z_bg" value={`${(g.Zbg/1e6).toFixed(3)}×10⁶`} unit="mm³" />
       </tbody></table>
+      <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Efisiensi & Kern (Nilson §4.3)</p>
+      <table className="w-full"><tbody>
+        <ResultRow label="r² = I_g/A_g" value={fmt(g.r2)} unit="mm²" />
+        <ResultRow label="k_t (kern atas = r²/y_b)" value={fmt(g.kt)} unit="mm" />
+        <ResultRow label="k_b (kern bawah = r²/y_t)" value={fmt(g.kb)} unit="mm" />
+        <ResultRow label="ρ efisiensi = r²/(y_t·y_b)" value={g.efficiency.toFixed(3)} />
+      </tbody></table>
+      <div className="text-[9px] text-gray-400 pl-1 -mt-1">
+        ρ→1 ideal; ρ≈0.33 persegi. Gaya prategang dalam zona kern (−k_b…k_t) ⇒ seluruh penampang tertekan.
+      </div>
       <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Komposit</p>
       <table className="w-full"><tbody>
         <ResultRow label="n_c" value={c.modularRatioNc.toFixed(4)} />
@@ -350,6 +360,27 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
         Mcr = {fmt(Mcr_flex)} kN·m  (fr={fmt(fr,3)} · fpe_bot={fmt(fpe_bot,3)} · fd={fmt(fd_bot,3)} MPa)
       </div>
 
+      {/* Flexural Load Stages — Changes in Prestress Force (Nilson §1.7/§3.6) */}
+      {r.flexuralStages && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Tahapan Lentur & Perubahan Gaya Prategang (Nilson §1.7/§3.6)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="M_dekompresi (serat bawah → 0)" value={fmt(r.flexuralStages.M_dec)} unit="kN·m" />
+            <ResultRow label="M_cr retak (serat bawah → +fr)" value={fmt(r.flexuralStages.M_cr)} unit="kN·m" />
+            <ResultRow label="f_se efektif" value={fmt(r.flexuralStages.fse)} unit="MPa" />
+            <ResultRow label="f_p saat dekompresi beton" value={fmt(r.flexuralStages.fp_dec)} unit="MPa" />
+            <ResultRow label="f_ps ultimit" value={fmt(r.flexuralStages.fps)} unit="MPa" />
+            <ResultRow label="Δf_p total = f_ps − f_se" value={fmt(r.flexuralStages.delta_fp_total)} unit="MPa" />
+            <ResultRow label="Rasio kenaikan = Δf_p/f_ps" value={(r.flexuralStages.stress_rise_ratio*100).toFixed(1)} unit="%" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 -mt-1">
+            Tegangan strand naik perlahan hingga retak, lalu cepat — kenaikan kecil ⇒ penampang efisien.
+          </div>
+        </>
+      )}
+
       {/* Ductility & Minimum Steel */}
       {(() => {
         const ductility = checkDuctility(uls.c, hComp - (g.yb - e));
@@ -404,6 +435,33 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
         <CheckRow label="φ(Vc+Vp) ≥ Vu" value={fmt(0.75*(sh.Vc+sh.Vp))} limit={fmt(sh.Vu)}
           ok={sh.isAdequate} unit="kN" />
       </tbody></table>
+
+      {/* MCFT — Compression Field Theory (Nilson §5.11 / AASHTO general) */}
+      {r.mcftShear && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Metode Umum / Compression Field Theory (Nilson §5.11)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="ε_x (regangan longitudinal)" value={(r.mcftShear.epsilon_x*1000).toFixed(3)} unit="×10⁻³" />
+            <ResultRow label="β (faktor tarik beton)" value={r.mcftShear.beta.toFixed(2)} />
+            <ResultRow label="θ (sudut retak diagonal)" value={r.mcftShear.theta_deg.toFixed(1)} unit="°" />
+            <ResultRow label="V_c = 0.083β√f'c·bv·dv" value={fmt(r.mcftShear.Vc)} unit="kN" />
+            <ResultRow label="V_s (cot θ)" value={fmt(r.mcftShear.Vs)} unit="kN" />
+            <ResultRow label="V_n = Vc+Vs+Vp" value={fmt(r.mcftShear.Vn)} unit="kN" />
+            <ResultRow label="A_v/s diperlukan (MCFT)" value={r.mcftShear.AvPerS_req.toFixed(4)} unit="mm²/mm" />
+          </tbody></table>
+          <table className="w-full"><tbody>
+            <CheckRow label="φV_n ≥ V_u (MCFT)" value={fmt(r.mcftShear.phiVn)} limit={fmt(sh.Vu)}
+              ok={r.mcftShear.isAdequate} unit="kN" />
+            <CheckRow label="V_n ≤ V_n,max (0.25f'c·bv·dv)" value={fmt(r.mcftShear.Vn)} limit={fmt(r.mcftShear.Vn_max)}
+              ok={r.mcftShear.Vn <= r.mcftShear.Vn_max} unit="kN" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 -mt-1">
+            Metode sectional alternatif Vci/Vcw — truss sudut-variabel (f_po=0.70fpu).
+          </div>
+        </>
+      )}
 
       {/* Stirrup table */}
       <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Desain Sengkang (2 kaki)</p>
