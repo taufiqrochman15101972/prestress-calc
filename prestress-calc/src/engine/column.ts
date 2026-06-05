@@ -255,3 +255,87 @@ function isAngleBetween(a: number, a1: number, a2: number): boolean {
   const lo = Math.min(n1, n2), hi = Math.max(n1, n2);
   return (na >= lo && na <= hi) || (hi - lo > Math.PI && (na <= lo || na >= hi));
 }
+
+// ─── Column Slenderness — Moment Magnification ───────────────
+
+export interface SlendernessInputs {
+  /** Effective length factor k (1.0 = pinned-pinned, 0.5 = fixed-fixed) */
+  k: number;
+  /** Unsupported length (mm) */
+  Lu: number;
+  /** Moment of inertia of gross section (mm⁴) */
+  Ig: number;
+  /** Concrete modulus (MPa) */
+  Ec: number;
+  /** Ratio of factored sustained load to total factored axial load (0–1) */
+  beta_dns: number;
+  /** Factored axial load (kN) */
+  Pu: number;
+  /** Smaller factored end moment (kN·m) — use negative if double curvature */
+  M1: number;
+  /** Larger factored end moment (kN·m) — always positive */
+  M2: number;
+  /** Sway frame? false = non-sway (braced) */
+  isSway: boolean;
+}
+
+export interface SlendernessResult {
+  /** kLu/r — slenderness ratio */
+  readonly slenderness_ratio: number;
+  /** Is second-order analysis required? (kLu/r > 22 for braced frames) */
+  readonly secondOrderRequired: boolean;
+  /** Equivalent moment factor Cm */
+  readonly Cm: number;
+  /** Euler buckling load Pc (kN) */
+  readonly Pc: number;
+  /** Magnification factor δ_ns */
+  readonly delta_ns: number;
+  /** Magnified design moment Mc = δ_ns × M2 (kN·m) */
+  readonly Mc: number;
+}
+
+/**
+ * ACI 318-19 §6.2-6.3: Non-sway (braced) frame moment magnification.
+ * Slenderness limit: kLu/r > 22 → second-order effects required.
+ * Mc = δ_ns × M2, δ_ns = Cm / (1 − Pu/(0.75·Pc)) ≥ 1.0
+ */
+export function computeSlenderness(inp: SlendernessInputs): SlendernessResult {
+  const { k, Lu, Ig, Ec, beta_dns, Pu, M1, M2, isSway } = inp;
+
+  // Radius of gyration: r = 0.3h for rectangular (ACI §6.2.5)
+  // Using r = sqrt(Ig / Ag) with approx Ag = Ig/r² → r ≈ sqrt(Ig/Ag)
+  // For simplicity: r = 0.3 × dimension → use Lu/r formula directly
+  // EI (ACI §6.6.4.4.4): EI = 0.4·Ec·Ig / (1 + beta_dns)
+  const EI = (0.4 * Ec * Ig) / (1 + beta_dns);
+
+  // Euler buckling load
+  const kLu = k * Lu; // mm
+  const Pc = (Math.PI ** 2 * EI) / (kLu ** 2) / 1000; // kN
+
+  // r ≈ 0.3 × h for rectangular → estimate from EI and Pc
+  // Use a default radius of gyration based on √(Ig/Ag) approximation:
+  // For rectangular b×h: Ig = bh³/12, Ag = bh → r = h/√12 ≈ 0.289h
+  // Without knowing h explicitly, compute from Ig using cube root:
+  const r_est = 0.289 * Math.cbrt(Ig * 12); // very rough — use for display only
+  const slenderness_ratio = kLu / r_est;
+
+  const limit_braced = isSway ? 22 : 22;
+  const secondOrderRequired = slenderness_ratio > limit_braced;
+
+  // Cm (ACI §6.6.4.5.3): for braced frames with no transverse loads
+  const Cm = Math.max(0.4, isSway ? 1.0 : 0.6 + 0.4 * (M1 / M2));
+
+  // Magnification factor
+  const delta_ns = Math.max(1.0, Cm / (1 - Pu / (0.75 * Pc)));
+
+  const Mc = delta_ns * Math.max(Math.abs(M1), Math.abs(M2)); // kN·m
+
+  return Object.freeze({
+    slenderness_ratio,
+    secondOrderRequired,
+    Cm,
+    Pc,
+    delta_ns,
+    Mc,
+  });
+}

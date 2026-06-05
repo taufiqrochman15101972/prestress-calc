@@ -19,7 +19,7 @@ desktop.ini
 # Environment
 .env
 .env.*
-!.env.local.example
+prestress-calc/.env.local
 
 # Next.js
 prestress-calc/.next/

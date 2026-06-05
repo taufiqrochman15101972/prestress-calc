@@ -8,6 +8,7 @@ import { MomentDiagram } from "@/components/MomentDiagram";
 import { TendonProfileChart } from "@/components/TendonProfileChart";
 import { useDesignStore, resolveTendon } from "@/store/useDesignStore";
 import { fmt, fmtStress } from "@/lib/utils";
+import { checkDuctility, checkMinSteel, checkFatigue, PCI_MULTIPLIERS } from "@/engine/uls";
 import { DeflectionChart } from "@/components/DeflectionChart";
 import { MagnelDiagram } from "@/components/MagnelDiagram";
 import { TendonZoneChart } from "@/components/TendonZoneChart";
@@ -302,7 +303,8 @@ const STIRRUP_SIZES = [
 function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").ProjectInputs }) {
   const uls = r.ulsFlexure; const defl = r.deflection; const sh = r.ulsShear; const ish = r.interfaceShear;
   const g = r.gross; const c = r.composite; const p = r.prestress; const m = r.moments;
-  const { material, tendon, loads } = inputs;
+  const { material, tendon, loads, deck } = inputs;
+  const hComp = g.hTotal + deck.thicknessTd;
 
   // Eccentricity at midspan (derived same as store)
   const totalStrands = tendon.rows.reduce((s, row) => s + row.strandCount, 0);
@@ -347,6 +349,44 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
       <div className="text-[9px] text-gray-400 pl-1">
         Mcr = {fmt(Mcr_flex)} kN·m  (fr={fmt(fr,3)} · fpe_bot={fmt(fpe_bot,3)} · fd={fmt(fd_bot,3)} MPa)
       </div>
+
+      {/* Ductility & Minimum Steel */}
+      {(() => {
+        const ductility = checkDuctility(uls.c, hComp - (g.yb - e));
+        const minSt = checkMinSteel(Mcr_flex, uls.Mu, uls.phiMn);
+        const fatigue = checkFatigue(m.Mlive, totalStrands * inputs.tendon.singleStrandArea, hComp - (g.yb - e));
+        return (
+          <>
+            <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Daktilitas (ACI §21.2)</p>
+            <table className="w-full"><tbody>
+              <ResultRow label="c/dp ratio" value={fmt(ductility.c_dp_ratio, 3)} />
+              <ResultRow label="εt (net tension strain)" value={ductility.epsilon_t.toFixed(4)} />
+              <ResultRow label="Klasifikasi" value={ductility.strainClass} />
+              <ResultRow label="φ (applied)" value={fmt(ductility.phi, 2)} />
+            </tbody></table>
+            <table className="w-full"><tbody>
+              <CheckRow label="εt ≥ 0.004 (daktail)" value={fmt(ductility.epsilon_t,4)}
+                limit="0.004" ok={ductility.isDuctile} />
+            </tbody></table>
+
+            <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Tulangan Minimum (ACI §9.6.2)</p>
+            <table className="w-full"><tbody>
+              <CheckRow label="φMn ≥ 1.2Mcr" value={fmt(uls.phiMn)} limit={fmt(minSt.Mn_12Mcr_req)} ok={minSt.is_12Mcr_Ok} unit="kN·m" />
+              <CheckRow label="φMn ≥ 1.33Mu" value={fmt(uls.phiMn)} limit={fmt(minSt.Mn_133Mu_req)} ok={minSt.is_133Mu_Ok} unit="kN·m" />
+            </tbody></table>
+            <div className="text-[9px] text-gray-400 pl-1">ACI §9.6.2: cukup jika memenuhi salah satu (a) atau (b)</div>
+
+            <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Fatigue (ACI §26.12, TY Lin Ch.13)</p>
+            <table className="w-full"><tbody>
+              <ResultRow label="Δfps (range tegangan strand)" value={fmt(fatigue.delta_fps)} unit="MPa" />
+              <ResultRow label="Batas low-relax strand" value={`${fatigue.limit}`} unit="MPa" />
+            </tbody></table>
+            <table className="w-full"><tbody>
+              <CheckRow label="Δfps ≤ 125 MPa" value={fmt(fatigue.delta_fps)} limit={`${fatigue.limit}`} ok={fatigue.isOk} unit="MPa" />
+            </tbody></table>
+          </>
+        );
+      })()}
 
       {/* Shear */}
       <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Geser ULS (φ=0.75)</p>

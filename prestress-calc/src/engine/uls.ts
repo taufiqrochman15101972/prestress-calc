@@ -386,3 +386,175 @@ export function computeLoadBalance(
 
   return Object.freeze({ w_bal, M_bal, percentBalance });
 }
+
+// ─── Ductility Check (ACI 318-19 §21.2) ─────────────────────
+
+export interface DuctilityResult {
+  /** Net tensile strain at extreme tension steel */
+  readonly epsilon_t: number;
+  /** ACI classification: "tension-controlled" | "transition" | "compression-controlled" */
+  readonly strainClass: "tension-controlled" | "transition" | "compression-controlled";
+  /** Applicable φ factor */
+  readonly phi: number;
+  /** c/dp ratio */
+  readonly c_dp_ratio: number;
+  /** Is section ductile (εt ≥ 0.004)? */
+  readonly isDuctile: boolean;
+}
+
+/**
+ * ACI 318-19 §21.2: εt = εcu × (dt − c) / c  where εcu = 0.003
+ * Tension-controlled: εt ≥ 0.005 → φ = 0.90
+ * Transition:         0.002 ≤ εt < 0.005 → φ interpolated 0.65–0.90
+ * Compression-ctrl:   εt < 0.002 → φ = 0.65
+ */
+export function checkDuctility(c_mm: number, dp_mm: number): DuctilityResult {
+  const ECU = 0.003;
+  const epsilon_t = ECU * (dp_mm - c_mm) / c_mm;
+  const c_dp_ratio = c_mm / dp_mm;
+
+  let strainClass: DuctilityResult["strainClass"];
+  let phi: number;
+  if (epsilon_t >= 0.005) {
+    strainClass = "tension-controlled"; phi = 0.90;
+  } else if (epsilon_t >= 0.002) {
+    strainClass = "transition";
+    // Linear interpolation 0.65→0.90 over 0.002→0.005
+    phi = 0.65 + (0.90 - 0.65) * (epsilon_t - 0.002) / (0.005 - 0.002);
+  } else {
+    strainClass = "compression-controlled"; phi = 0.65;
+  }
+
+  return Object.freeze({ epsilon_t, strainClass, phi, c_dp_ratio, isDuctile: epsilon_t >= 0.004 });
+}
+
+// ─── Minimum Flexural Reinforcement (ACI 318-19 §9.6.2) ──────
+
+export interface MinSteelResult {
+  /** ACI §9.6.2.1: Mn ≥ 1.2·Mcr */
+  readonly Mn_12Mcr_req: number;   // kN·m
+  readonly is_12Mcr_Ok: boolean;
+  /** ACI §9.6.2.2: Mn ≥ 1.33·Mu */
+  readonly Mn_133Mu_req: number;   // kN·m
+  readonly is_133Mu_Ok: boolean;
+  /** Governing minimum */
+  readonly Mn_min_req: number;
+  readonly isMinOk: boolean;
+}
+
+export function checkMinSteel(Mcr: number, Mu: number, phiMn: number): MinSteelResult {
+  const req12Mcr = 1.2 * Mcr;
+  const req133Mu = 1.33 * Mu;
+  return Object.freeze({
+    Mn_12Mcr_req: req12Mcr,
+    is_12Mcr_Ok: phiMn >= req12Mcr,
+    Mn_133Mu_req: req133Mu,
+    is_133Mu_Ok: phiMn >= req133Mu,
+    Mn_min_req: Math.min(req12Mcr, req133Mu), // ACI: either (a) or (b) is sufficient
+    isMinOk: phiMn >= req12Mcr || phiMn >= req133Mu,
+  });
+}
+
+// ─── fps for Unbonded Tendons (ACI 318-19 §20.3.2.4b) ────────
+
+/**
+ * ACI Eq. 20.3.2.4.a-c for unbonded single-strand tendons:
+ *   fps = fse + 10000/dp + f'c/(100·ρ_p)  [psi, in → convert]
+ * or in SI (approximate equivalent):
+ *   fps = fse + 70 + fc'/(100·ρ_p)        [MPa]
+ * Subject to: fps ≤ fpy  and  fps ≤ fse + 420 MPa
+ *
+ * For span-to-depth ratio:
+ *   L/dp ≤ 35: Eq. (a) — use 70 MPa
+ *   L/dp > 35: Eq. (b) — use 35 MPa
+ */
+export function computeUnbondedFps(
+  fse_MPa: number,   // effective prestress
+  fpy_MPa: number,   // yield stress
+  fc_MPa: number,    // f'c
+  rho_p: number,     // Aps / (b·dp)
+  L_dp_ratio: number // span/dp
+): number {
+  const delta = L_dp_ratio <= 35 ? 70 : 35; // MPa
+  const fps_calc = fse_MPa + delta + fc_MPa / (100 * rho_p);
+  return Math.min(fps_calc, fpy_MPa, fse_MPa + 420);
+}
+
+// ─── PCI Deflection Multipliers (PCI Design Handbook 7th Ed.) ──
+
+/**
+ * PCI multipliers for long-term deflection of pretensioned members.
+ * Branson method (1963) / PCI Table 4.4.2.
+ *
+ * At erection (typical 30–60 days):
+ *   Camber ×1.80, Deflection (DL) ×1.85
+ * Final after SDL:
+ *   Camber ×1.80, DL ×2.70
+ */
+export const PCI_MULTIPLIERS = Object.freeze({
+  /** Multiplier for initial camber at erection */
+  camber_at_erection: 1.80,
+  /** Multiplier for dead-load deflection at erection */
+  dl_at_erection: 1.85,
+  /** Final long-term multiplier for camber (prestress) */
+  camber_final: 1.80,
+  /** Final long-term multiplier for dead-load deflection */
+  dl_final: 2.70,
+  /** Live load — no creep multiplier (instantaneous) */
+  ll_multiplier: 1.00,
+} as const);
+
+export interface DeflectionStagedResult extends DeflectionResult {
+  /** At erection: camber minus DL (before SDL) */
+  readonly delta_erection: number;
+  /** Final net (after creep on all DL + live) */
+  readonly delta_final_net: number;
+  /** PCI method used? */
+  readonly usedPCI: boolean;
+}
+
+export function computeDeflectionPCI(inputs: DeflectionInputs): DeflectionStagedResult {
+  const base = computeDeflection(inputs);
+  const m = PCI_MULTIPLIERS;
+  const delta_erection  = base.deltaCamber * m.camber_at_erection - base.deltaSW * m.dl_at_erection;
+  const delta_final_net = base.deltaCamber * m.camber_final - base.deltaSW * m.dl_final
+                        - base.deltaDeck * m.dl_final - base.deltaLive;
+  return Object.freeze({
+    ...base,
+    delta_erection,
+    delta_final_net,
+    usedPCI: true,
+  });
+}
+
+// ─── Fatigue Check (ACI 318-19 §26.12, TY Lin Ch.13) ─────────
+
+export interface FatigueResult {
+  /** Live-load stress range in prestressed steel (MPa) */
+  readonly delta_fps: number;
+  /** ACI limit for stress range in low-relax strand: 125 MPa */
+  readonly limit: number;
+  /** true if delta_fps ≤ limit */
+  readonly isOk: boolean;
+}
+
+/**
+ * Fatigue stress range in bonded tendon at midspan.
+ * Δfps = Aps_area and M_live contribution at cracked section.
+ * Simplified: Δfps ≈ M_live × dp / (Aps × d_arm × jd)
+ * More precise: use cracked section analysis
+ *
+ * ACI 318-19 §26.12.5.1: stress range ≤ 125 MPa for low-relax strand.
+ */
+export function checkFatigue(
+  M_live_kNm: number,
+  Aps: number,     // mm²
+  dp: number,      // mm — tendon depth from compression face
+  jd = 0.90        // lever arm factor ≈ 0.85–0.95
+): FatigueResult {
+  // Stress range = M_live / (Aps × j × dp)
+  const delta_fps = (M_live_kNm * 1e6) / (Aps * jd * dp);
+  const limit = 125; // MPa — ACI low-relax strand limit
+  return Object.freeze({ delta_fps, limit, isOk: delta_fps <= limit });
+}
+

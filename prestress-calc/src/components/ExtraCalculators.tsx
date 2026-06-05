@@ -4,8 +4,9 @@ import React, { useState } from "react";
 import { PileCalculator } from "@/components/PileCalculator";
 import { ColumnCalculator } from "@/components/ColumnCalculator";
 import { SlabCalculator } from "@/components/SlabCalculator";
+import { TankCalculator } from "@/components/TankCalculator";
 
-type ExtraTab = "pile" | "column" | "slab";
+type ExtraTab = "pile" | "column" | "slab" | "tank";
 
 interface Props {
   open: boolean;
@@ -30,6 +31,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     emoji: "🏗",
     title: "Pelat Post-Tension 2-Arah",
     subtitle: "Load balancing TY Lin — geser pons, tegangan serat, lendutan",
+  },
+  {
+    key: "tank",
+    emoji: "🛢",
+    title: "Tangki/Pipa Prategang Sirkuler",
+    subtitle: "Prategang melingkar — tegangan hoop, tekanan cairan, ACI 350",
   },
 ];
 
@@ -84,6 +91,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "pile" && "TY Lin & Burns, Ch. 10 — Tension & Compression Members · ACI 318-19 §10 · SNI 7833:2012 Tiang Pancang Beton Prategang"}
           {tab === "column" && "TY Lin & Burns, Ch. 11 — Compression Members · ACI 318-19 §22.4 — P-M Interaction Diagram · SNI 2847:2019"}
           {tab === "slab" && "TY Lin & Burns, Ch. 9 — Two-Way Slabs · ACI 318-19 §8.10 — Equivalent Frame · PTI DC20.9 Post-Tensioned Slab Design"}
+          {tab === "tank" && "TY Lin & Burns, Ch. 10 — Circular Prestressing · ACI 350-20 Liquid-Retaining Structures · AWWA D110"}
         </div>
 
         {/* Content */}
@@ -91,6 +99,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "pile"   && <PileCalculator />}
           {tab === "column" && <ColumnCalculator />}
           {tab === "slab"   && <SlabCalculator />}
+          {tab === "tank"   && <TankCalculator />}
         </div>
 
         {/* Footer */}
