@@ -1,8 +1,13 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computeColumnPM } from "@/engine/column";
-import type { ColumnInputs } from "@/engine/column";
+import { computeColumnPM, computeSlenderness } from "@/engine/column";
+import type { ColumnInputs, SlendernessInputs } from "@/engine/column";
+
+const DEFAULT_SLEND: SlendernessInputs = {
+  k: 1.0, Lu: 4000, Ig: 7_200_000_000, Ec: 29725,
+  beta_dns: 0.6, Pu: 2500, M1: 200, M2: 300, isSway: false,
+};
 
 // Default: 400×600 rectangular prestressed column
 const DEFAULT: ColumnInputs = {
@@ -32,9 +37,12 @@ export function ColumnCalculator() {
   const [inp, setInp] = useState<ColumnInputs>(DEFAULT);
   const [Pu, setPu] = useState(DEFAULT.Pu);
   const [Mu, setMu] = useState(DEFAULT.Mu);
+  const [slendInp, setSlendInp] = useState<SlendernessInputs>(DEFAULT_SLEND);
+  const [showSlend, setShowSlend] = useState(false);
 
   const res = useMemo(() =>
     computeColumnPM({ ...inp, Pu, Mu }), [inp, Pu, Mu]);
+  const slend = useMemo(() => computeSlenderness(slendInp), [slendInp]);
 
   const f = (v: number, d = 1) => v.toFixed(d);
 
@@ -49,6 +57,7 @@ export function ColumnCalculator() {
   const curvePts = res.curve.map(p => `${cx(p.Mn).toFixed(1)},${cy(p.Pn).toFixed(1)}`).join(" ");
 
   return (
+    <>
     <div className="flex gap-4 text-[11px]">
 
       {/* Inputs */}
@@ -200,5 +209,86 @@ export function ColumnCalculator() {
       </div>
 
     </div>
+
+    {/* Slenderness Section */}
+    <div className="mt-3 border-t border-gray-200 pt-2">
+      <button onClick={() => setShowSlend(v => !v)}
+        className="flex items-center gap-1.5 text-[10px] font-bold text-blue-700 hover:text-blue-900">
+        <span>{showSlend ? "▼" : "▶"}</span>
+        Kelangsingan Kolom — Pembesaran Momen ACI §6.6.4 (TY Lin Ch.11)
+      </button>
+
+      {showSlend && (
+        <div className="mt-2 flex gap-4 text-[11px]">
+          <div className="w-64 flex-none">
+            <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">Parameter Kelangsingan</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
+                ["k (faktor panjang efektif)", "k", slendInp.k, 0.05, 0, ""],
+                ["Lu (panjang tak ditopang)", "Lu", slendInp.Lu, 500, 0, "mm"],
+                ["β_dns (sustained load ratio)", "beta_dns", slendInp.beta_dns, 0.05, 0, ""],
+                ["Pu beban terfaktor", "Pu", slendInp.Pu, 100, 0, "kN"],
+                ["M1 momen lebih kecil", "M1", slendInp.M1, 10, undefined, "kN·m"],
+                ["M2 momen lebih besar", "M2", slendInp.M2, 10, 0, "kN·m"],
+              ] as [string, keyof SlendernessInputs, number, number, number|undefined, string][]).map(([lbl, key, val, step, min, unit]) => (
+                <div key={key} className="flex flex-col gap-0.5">
+                  <span className="text-[9px] font-medium text-gray-500 leading-tight">{lbl}</span>
+                  <div className="relative flex items-center">
+                    <input type="number" value={val} step={step} {...(min !== undefined ? {min} : {})}
+                      onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setSlendInp(prev => ({...prev, [key]: v})); }}
+                      className={`w-full rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 ${unit?"pr-10":""}`} />
+                    {unit && <span className="absolute right-1 text-[9px] text-gray-400 pointer-events-none">{unit}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <label className="text-[10px] text-gray-600 flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={slendInp.isSway}
+                  onChange={e => setSlendInp(prev => ({...prev, isSway: e.target.checked}))}
+                  className="w-3 h-3" />
+                Rangka tak-berpengaku (sway)
+              </label>
+            </div>
+            <div className="mt-1.5 bg-blue-50 border border-blue-200 rounded p-2 text-[10px]">
+              <p className="font-semibold text-blue-700">ACI §6.6.4 (TY Lin Ch.11):</p>
+              <p className="text-blue-600 mt-0.5">Mc = δ_ns·M2 ≥ M2<br/>δ_ns = Cm / (1 − Pu/0.75Pc) ≥ 1.0<br/>Cm = 0.6 + 0.4·(M1/M2) ≥ 0.4</p>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">Hasil Kelangsingan</p>
+            <table className="w-full text-[10px]"><tbody>
+              {([
+                ["kLu/r (rasio kelangsingan)", f(slend.slenderness_ratio, 1)],
+                ["EI efektif (ACI §6.6.4.4.4)", (slend.Pc * slendInp.k * slendInp.Lu * slendInp.k * slendInp.Lu / Math.PI**2 / 1e9).toFixed(3) + " ×10⁹ N·mm²"],
+                ["Pc (beban kritis Euler)", f(slend.Pc, 0) + " kN"],
+                ["Cm (faktor momen ekivalen)", f(slend.Cm, 3)],
+                ["δ_ns (faktor pembesaran)", f(slend.delta_ns, 3)],
+                ["Mc = δ_ns·M2 (momen desain)", f(slend.Mc, 1) + " kN·m"],
+              ] as [string, string][]).map(([lbl, val]) => (
+                <tr key={lbl} className="border-b border-gray-100">
+                  <td className="py-0.5 pr-3 text-gray-500">{lbl}</td>
+                  <td className="py-0.5 font-mono font-semibold text-gray-800 text-right">{val}</td>
+                </tr>
+              ))}
+            </tbody></table>
+
+            <div className={`mt-2 px-2 py-1.5 rounded border text-[10px] font-bold ${slend.secondOrderRequired ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+              {slend.secondOrderRequired
+                ? `⚠ kLu/r = ${f(slend.slenderness_ratio,1)} > 22 — efek orde kedua diperhitungkan (pembesaran momen)`
+                : `✓ kLu/r = ${f(slend.slenderness_ratio,1)} ≤ 22 — kelangsingan dapat diabaikan per ACI §6.2.5`}
+            </div>
+            {slend.secondOrderRequired && (
+              <div className="mt-1.5 bg-yellow-50 border border-yellow-200 rounded p-2 text-[10px]">
+                <span className="font-semibold">Gunakan Mc = {f(slend.Mc,1)} kN·m</span> sebagai pengganti M2 = {f(slendInp.M2,1)} kN·m
+                dalam kontrol P-M interaction diagram di atas.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+    </>
   );
 }

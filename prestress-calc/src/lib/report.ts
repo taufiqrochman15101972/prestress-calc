@@ -16,10 +16,16 @@
  *  13 Keseimbangan Beban (Load Balancing – TY Lin)
  *  14 Panjang Transfer & Pengembangan (ACI §25.8.8)
  *  15 Zona Angkur – Bursting & Spalling (AASHTO §5.10.9.3)
- *  16 Lebar Retak (ACI 224R) — hanya jika partial prestress
+ *  16 PPR (Partial Prestress Ratio)
+ *  17 Torsi (kondisional)
+ *  18 Balok Menerus (kondisional)
+ *  19 Daktilitas — εt ACI §21.2
+ *  20 Kelelahan (Fatigue) — Δfps ACI §26.12
+ *     Lebar Retak (ACI 224R) — hanya jika partial prestress
  */
 import type { ProjectInputs, DesignResults, AppSettings } from "@/types";
 import { girderHeight } from "@/engine/section";
+import { checkDuctility, checkMinSteel, checkFatigue } from "@/engine/uls";
 
 // ─── Formatting helpers ───────────────────────────────────────
 function n(v: number, d = 2)  { return v.toFixed(d); }
@@ -606,6 +612,75 @@ ${cb && cb.nSpans > 1 ? section(`18. Balok Menerus ${cb.nSpans} Bentang — Mome
     </div>`
   )}
 `) : ""}
+
+${(() => {
+  // §19 Daktilitas & §20 Fatigue — computed inline
+  const dp = hComp - (g.yb - e_mid);
+  const duct = checkDuctility(uf.c, dp);
+  const minSt = checkMinSteel(
+    (c.Zbc * (0.62 * Math.sqrt(material.fc) + (p.Pe * 1000) / g.areaAg + (p.Pe * 1000 * e_mid) / g.Zbg - ((m.Mg + m.Msdl) * 1e6) / g.Zbg)) / 1e6,
+    uf.Mu, uf.phiMn
+  );
+  const fat = checkFatigue(m.Mlive, Aps, dp);
+  return section("19. Daktilitas Penampang — εt ACI §21.2 / TY Lin Ch.13", `
+  <div class="info-box" style="margin-bottom:5px">
+    Klasifikasi penampang berdasarkan regangan tarik bersih εt di serat tarik terluar saat Mn tercapai.
+    ACI §21.2: εt ≥ 0.004 → tension-controlled (daktail).
+  </div>
+  ${twoCol(
+    table(
+      row("c (garis netral)", mm(uf.c)) +
+      row("d_p (jarak tendon dari atas komposit)", mm(dp)) +
+      row("c/d_p", n(uf.c / dp, 4)) +
+      row("εt = (0.003/c)·(dp−c)", n(duct.epsilon_t, 5)) +
+      row("Klasifikasi", duct.strainClass) +
+      row("φ faktor kapasitas", n(duct.phi, 2))
+    ),
+    table(
+      row("φMn kapasitas", kNm(uf.phiMn)) +
+      row("1.2·Mcr (min)", kNm(minSt.Mn_12Mcr_req)) +
+      row("1.33·Mu (min)", kNm(minSt.Mn_133Mu_req))
+    ) +
+    `<div class="check-row ${duct.isDuctile ? "" : "fail"}">
+      <span class="check-label">εt ≥ 0.004 (daktail)</span>
+      <span class="check-value">εt = ${n(duct.epsilon_t,5)}</span>
+      <span>${check(duct.isDuctile)}</span>
+    </div>
+    <div class="check-row ${minSt.is_12Mcr_Ok ? "" : "fail"}">
+      <span class="check-label">φMn ≥ 1.2Mcr (ACI §9.6.2a)</span>
+      <span class="check-value">${kNm(uf.phiMn)} ≥ ${kNm(minSt.Mn_12Mcr_req)}</span>
+      <span>${check(minSt.is_12Mcr_Ok)}</span>
+    </div>
+    <div class="check-row ${minSt.is_133Mu_Ok ? "" : "fail"}">
+      <span class="check-label">φMn ≥ 1.33Mu (ACI §9.6.2b)</span>
+      <span class="check-value">${kNm(uf.phiMn)} ≥ ${kNm(minSt.Mn_133Mu_req)}</span>
+      <span>${check(minSt.is_133Mu_Ok)}</span>
+    </div>`
+  )}
+`) + section("20. Kelelahan Strand — Fatigue (ACI §26.12, TY Lin Ch.13)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Kontrol kelelahan low-relaxation strand: rentang tegangan akibat beban hidup Δfps ≤ 125 MPa (ACI §26.12.5.2).
+    Menggunakan metode transformasi penampang retak (cracked section) jd = 0.9·dp.
+  </div>
+  ${twoCol(
+    table(
+      row("M_live (momen hidup)", kNm(m.Mlive)) +
+      row("A_ps strand aktif", mm2(Aps)) +
+      row("d_p efektif", mm(dp)) +
+      row("j·d ≈ 0.9·dp", mm(0.9 * dp)) +
+      row("Δfps = M_live / (Aps·jd)", MPa(fat.delta_fps))
+    ),
+    table(
+      row("Batas kelelahan low-relax", `${fat.limit} MPa`)
+    ) +
+    `<div class="check-row ${fat.isOk ? "" : "fail"}">
+      <span class="check-label">Δfps ≤ ${fat.limit} MPa (ACI §26.12)</span>
+      <span class="check-value">Δfps = ${MPa(fat.delta_fps)}</span>
+      <span>${check(fat.isOk)}</span>
+    </div>`
+  )}
+`);
+})()}
 
 ${cw ? section("Lebar Retak — Prategang Sebagian (ACI 224R-01 Gergely-Lutz)", twoCol(
   `<div class="sub-title">Hasil Perhitungan Lebar Retak</div>` +
