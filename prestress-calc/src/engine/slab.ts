@@ -158,11 +158,11 @@ export function computePTSlab(inp: PTSlabInputs): PTSlabResult {
   const d_eff = 0.8 * t; // effective depth (mm)
   const bo = 2 * (cx + d_eff) + 2 * (cy + d_eff); // critical perimeter (mm)
 
-  // Reaction on critical section: wu_factored × (Lx × Ly − critical_area) / panel
-  // Simplified: Vu_punch = wu_factored × Lx_m × Ly_m × 0.85 (minus column area)
+  // Reaction on critical section: factored load over the tributary panel area
+  // minus the area inside the critical perimeter.
+  // wu_factored [kN/m²] × area [m²] = kN  (no extra ×1000).
   const A_crit = (cx + d_eff) * (cy + d_eff); // mm²
-  const Vu_punch = (wu_factored * Lx_m * Ly_m) * 1000
-                 - (wu_factored * A_crit * 1e-6); // kN
+  const Vu_punch = wu_factored * (Lx_m * Ly_m - A_crit * 1e-6); // kN
 
   // ACI §22.6.5.2: Vc = min of 3 equations
   const beta_c = Math.max(cx, cy) / Math.min(cx, cy);
