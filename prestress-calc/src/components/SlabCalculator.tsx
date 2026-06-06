@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { computePTSlab, computeSlabMomentTransfer } from "@/engine/slab";
+import { computeFloorVibration } from "@/engine/vibration";
 import type { PTSlabInputs } from "@/engine/slab";
 
 const DEFAULT: PTSlabInputs = {
@@ -58,6 +59,14 @@ export function SlabCalculator() {
   const mt = useMemo(() => computeSlabMomentTransfer({
     Vu: res.Vu_punch, M_unb: Munb, cx: inp.cx, cy: inp.cy, t: inp.t, fc: inp.fc,
   }), [res.Vu_punch, Munb, inp.cx, inp.cy, inp.t, inp.fc]);
+
+  // Floor vibration (Khan §9.2) — uses permanent mass: self + SDL + 10% live.
+  const [zeta, setZeta] = useState(0.03); // damping ratio (furnished floor)
+  const vib = useMemo(() => computeFloorVibration({
+    spanL_m: inp.Lx / 1000, width_m: inp.Ly / 1000, t_mm: inp.t, fc: inp.fc,
+    wPermanent: res.wSelf + inp.wSDL + 0.1 * inp.wLive,
+    dampingRatio: zeta, use: "office",
+  }), [inp.Lx, inp.Ly, inp.t, inp.fc, res.wSelf, inp.wSDL, inp.wLive, zeta]);
   const f = (v: number, d = 2) => v.toFixed(d);
 
   return (
@@ -153,6 +162,33 @@ export function SlabCalculator() {
           <p className="font-bold text-indigo-800">Detail Geser Pons (ACI §22.6)</p>
           <p>bo (keliling kritis) = {f(res.bo,0)} mm &nbsp;·&nbsp; Vu = {f(res.Vu_punch,1)} kN</p>
           <p>Vc = {f(res.Vc_punch,1)} kN &nbsp;·&nbsp; φVc = {f(res.phiVc_punch,1)} kN (φ=0.75)</p>
+        </div>
+
+        {/* Floor vibration (Khan §9.2 / SCI P354) */}
+        <div>
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-[9px] font-bold text-gray-500 uppercase">Vibrasi Lantai — Footfall (Khan §9.2)</p>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-gray-500">ζ redaman</span>
+              <input type="number" value={zeta} step={0.005}
+                onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setZeta(v); }}
+                className="w-16 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+          </div>
+          <table className="w-full"><tbody>
+            <Row label="δ massa permanen (gross)" value={f(vib.deflection_mm,2)} unit="mm" />
+            <Row label="f₀ = 18/√δ (frek. alami)" value={f(vib.f0,2)} unit="Hz" />
+            <Row label={`Tipe lantai`} value={vib.isLowFrequency ? "frekuensi-rendah (resonan)" : "frekuensi-tinggi (transien)"} />
+            <Row label={`Harmonik pemicu h (α=${f(vib.alphaH,2)})`} value={`${vib.harmonic}`} />
+            <Row label="Massa modal" value={f(vib.modalMass,0)} unit="kg" />
+            <Row label="a puncak" value={f(vib.accelPeak,3)} unit="m/s²" />
+            <Row label="a/g" value={f(vib.accelRatioG,2)} unit="%" />
+            <Row label="Faktor respons R" value={f(vib.responseFactor,2)} />
+          </tbody></table>
+          <div className="mt-0.5">
+            <Chk label="Respons R ≤ batas (kantor=8)"
+              value={`R=${f(vib.responseFactor,2)}`} limit={`${vib.limitR}`} ok={vib.isOk} />
+          </div>
         </div>
 
         {/* Moment transfer at column (Nilson §10.15, ACI §8.4.2.3) */}

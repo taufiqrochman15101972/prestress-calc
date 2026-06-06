@@ -9,8 +9,9 @@ import { TensionCalculator } from "@/components/TensionCalculator";
 import { CorbelCalculator } from "@/components/CorbelCalculator";
 import { DappedEndCalculator } from "@/components/DappedEndCalculator";
 import { BearingCalculator } from "@/components/BearingCalculator";
+import { SlabOnGradeCalculator } from "@/components/SlabOnGradeCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade";
 
 interface Props {
   open: boolean;
@@ -65,6 +66,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     emoji: "🧱",
     title: "Bantalan Elastomer",
     subtitle: "Pad elastomer berlapis — S, σ, geser, stabilitas (Libby §12-9, AASHTO §14.7.6)",
+  },
+  {
+    key: "grade",
+    emoji: "🛣",
+    title: "Pelat di Atas Tanah (PT)",
+    subtitle: "Slab-on-grade — Westergaard, ℓ, friksi tanah, bebas retak (Khan §11)",
   },
 ];
 
@@ -124,6 +131,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "corbel" && "Nilson §12.4–12.5 — Brackets & Corbels · ACI 318-19 §16.5 — Shear-Friction Method"}
           {tab === "dapped" && "Libby, Modern Prestressed Concrete §12-6 — Dapped-End Connections · PCI Design Handbook (5 mode runtuh)"}
           {tab === "bearing" && "Libby, Modern Prestressed Concrete §12-9 — Elastomeric Bearing Pads · AASHTO LRFD §14.7.6 Metode A"}
+          {tab === "grade" && "Khan & Williams, Post-tensioned Concrete Floors §11 — Slabs on Grade · Westergaard plat di atas fondasi elastis"}
         </div>
 
         {/* Content */}
@@ -136,6 +144,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "corbel"  && <CorbelCalculator />}
           {tab === "dapped"  && <DappedEndCalculator />}
           {tab === "bearing" && <BearingCalculator />}
+          {tab === "grade"   && <SlabOnGradeCalculator />}
         </div>
 
         {/* Footer */}
