@@ -110,6 +110,14 @@ function anchorageSlipProfile(
   const p = (Pj - PL) / L; // N/mm (using kN → N: multiply after)
   // Convert p to N/mm: Pj and PL are in kN, so p is in kN/mm → ×1000 for N/mm
   const pNmm = p * 1000;
+
+  // No friction gradient (e.g. pretensioned straight strand with μ=K=0):
+  // the seating-loss wedge model is undefined (Lset→∞). At member level the
+  // abutment holds the strand, so there is no anchorage draw-in loss here.
+  if (pNmm <= 1e-9 || deltaSet <= 0) {
+    return [...frictionPx];
+  }
+
   const Lset = Math.sqrt((deltaSet * Aps * Eps) / pNmm);
 
   const n = frictionPx.length;
