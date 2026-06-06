@@ -10,7 +10,7 @@ import { openPrintReport } from "@/lib/report";
 export default function Home() {
   const {
     compute, inputs, results, loadFromLocal,
-    settings, setUnitSystem, setFormulaVariant,
+    settings, setUnitSystem, setFormulaVariant, setPrestressSystem,
     updatePartialPrestress,
   } = useDesignStore();
   const [extraOpen, setExtraOpen] = React.useState(false);
@@ -24,7 +24,7 @@ export default function Home() {
     if (results) openPrintReport(inputs, results, settings);
   }, [inputs, results, settings]);
 
-  const { unitSystem, formulaVariant } = settings;
+  const { unitSystem, formulaVariant, prestressSystem } = settings;
   const isPartial = inputs.partialPrestress.enabled;
 
   return (
@@ -85,6 +85,32 @@ export default function Home() {
             }`}
           >
             Kernel
+          </button>
+        </div>
+
+        {/* Construction method toggle — POST-TENSIONED prioritized */}
+        <div className="flex items-center gap-0.5 bg-white/10 rounded p-0.5">
+          <button
+            onClick={() => setPrestressSystem("POST_TENSIONED")}
+            title="Pasca-tarik (Post-tensioned): tendon dalam duct, ditegangkan setelah beton kuat — friksi + draw-in angkur"
+            className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
+              prestressSystem === "POST_TENSIONED"
+                ? "bg-white text-blue-700"
+                : "text-white/80 hover:text-white hover:bg-white/20"
+            }`}
+          >
+            🔗 PT
+          </button>
+          <button
+            onClick={() => setPrestressSystem("PRETENSIONED")}
+            title="Pra-tarik (Pretensioned): strand ditegangkan di bed sebelum cor — tanpa friksi duct, transmission length"
+            className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
+              prestressSystem === "PRETENSIONED"
+                ? "bg-white text-blue-700"
+                : "text-white/80 hover:text-white hover:bg-white/20"
+            }`}
+          >
+            ⚓ Pre-T
           </button>
         </div>
 

@@ -25,7 +25,11 @@
  *  22 Geser Metode Umum / Compression Field Theory (Nilson §5.11)
  *  23 Redistribusi Momen (Nilson §8.10) — kondisional menerus
  *  24 Estimasi Kehilangan Lump-Sum (Nilson §6.2) — pembanding
+ *  25 Metode BS 8110 (Kong & Evans Ch.9) — flexure fpb·Aps(d−0.45x), shear Vco/Vcr
  *     Lebar Retak (ACI 224R) — hanya jika partial prestress
+ *
+ * Calculation rows use calc3(): formula → numbers substituted → result+units.
+ * Header tags the construction method (PRA-TARIK / PASCA-TARIK).
  */
 import type { ProjectInputs, DesignResults, AppSettings } from "@/types";
 import { girderHeight } from "@/engine/section";
@@ -70,6 +74,23 @@ function checkRow(label: string, value: string, limit: string, ok: boolean) {
   </div>`;
 }
 
+/**
+ * Three-line calculation block (per project requirement):
+ *   line 1 — symbolic formula
+ *   line 2 — formula with numbers substituted
+ *   line 3 — final result with units
+ * Short calcs may pass "" for `subst` to collapse to two lines.
+ */
+function calc3(label: string, formula: string, subst: string, result: string) {
+  const mid = subst ? `<div class="calc-ln">= ${subst}</div>` : "";
+  return `<div class="calc">
+    <div class="calc-lbl">${label} =</div>
+    <div class="calc-ln">${formula}</div>
+    ${mid}
+    <div class="calc-ln calc-res">= ${result}</div>
+  </div>`;
+}
+
 // ─── CSS ────────────────────────────────────────────────────
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -102,6 +123,14 @@ const CSS = `
 
   .two-col { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+
+  /* 3-line calculation block: formula → substitution → result */
+  .calc { margin:3px 0 5px; padding:3px 7px; background:#f8fafc; border-left:2.5px solid #6366f1;
+    border-radius:0 3px 3px 0; break-inside:avoid; }
+  .calc-lbl { font-size:8pt; font-weight:700; color:#374151; }
+  .calc-ln { font-family:"Courier New",monospace; font-size:8pt; color:#1f2937;
+    padding-left:10px; line-height:1.45; }
+  .calc-res { color:#4338ca; font-weight:700; }
 
   .check-row { display:flex; justify-content:space-between; align-items:center;
     background:#f0fdf4; border:1px solid #bbf7d0; border-radius:3px;
@@ -183,6 +212,9 @@ export function openPrintReport(
     C: "Class C — Penampang Retak (1.00√f'c)",
   };
   const beamClassLabel = beamClassLabels[sls.beamClass] ?? "";
+  const systemLabel = settings?.prestressSystem === "PRETENSIONED"
+    ? "PRA-TARIK (Pretensioned)"
+    : "PASCA-TARIK (Post-tensioned)";
 
   const { projectInfo } = inputs;
   const now = new Date().toLocaleString("id-ID", { dateStyle: "long", timeStyle: "short" });
@@ -226,7 +258,7 @@ export function openPrintReport(
   </div>
   <div class="meta">
     <span>Cetak: ${now}</span>
-    <span>L = ${n(loads.spanLength/1000,2)} m · H = ${hGirder} mm · Komposit = ${hComp} mm · ${beamClassLabel}</span>
+    <span>L = ${n(loads.spanLength/1000,2)} m · H = ${hGirder} mm · Komposit = ${hComp} mm · ${beamClassLabel} · ${systemLabel}</span>
   </div>
 </div>
 
@@ -276,7 +308,14 @@ ${twoCol(
     row("k_t (kern atas = r²/y_b)", mm(g.kt)) +
     row("k_b (kern bawah = r²/y_t)", mm(g.kb)) +
     row("ρ efisiensi = r²/(y_t·y_b)", n(g.efficiency, 3))
-  )),
+  ) +
+    calc3("y_b", "Σ(Aᵢ·ȳᵢ) / A_g",
+      `${sci(g.yb * g.areaAg, 9)} / ${n(g.areaAg,0)}`, `${mm(g.yb)}`) +
+    calc3("Z_bg", "I_g / y_b",
+      `${sci(g.momentOfInertiaIg,11)} / ${n(g.yb,1)}`, `${sci(g.Zbg,6)} mm³`) +
+    calc3("ρ", "r² / (y_t · y_b)",
+      `${n(g.r2,0)} / (${n(g.yt,1)} · ${n(g.yb,1)})`, `${n(g.efficiency,3)}`)
+  ),
   section("4. Penampang Komposit (Transformasi)", table(
     row("n_c = E_deck/E_girder", n(c.modularRatioNc, 4)) +
     row("A_deck,tr = n_c·b_eff·t_d", `${n(c.deckTransformedArea,0)}`, "mm²") +
@@ -387,6 +426,14 @@ ${section("8. Kontrol SLS — Tegangan Serat", `
       ${[sls.transfer.topFiber, sls.transfer.botFiber].map(f => fiberRow(f, showKernel)).join("")}
     </tbody>
   </table>
+  ${calc3("σ_bot (transfer)", "−P_i/A_g − P_i·e/Z_bg + M_g/Z_bg",
+    `${n(sls.transfer.botFiber.terms.axial,2)} ${sls.transfer.botFiber.terms.eccentricity>=0?"+":"−"} ${n(Math.abs(sls.transfer.botFiber.terms.eccentricity),2)} ${sls.transfer.botFiber.terms.moment>=0?"+":"−"} ${n(Math.abs(sls.transfer.botFiber.terms.moment),2)}`,
+    `${MPa(sls.transfer.sigmaBot)}`)}
+  <div class="calc" style="border-left-color:#10b981">
+    <div class="calc-lbl">σ_bot bentuk Kernel (ekuivalen) =</div>
+    <div class="calc-ln">−P_i/A_g·(1 + e·y_b/r²) + M_g/Z_bg</div>
+    <div class="calc-ln calc-res">= ${MPa(sls.transfer.sigmaBot)} &nbsp;(identik — dua rumus = hasil sama)</div>
+  </div>
   <div class="sub-title" style="margin-top:5px">Tahap Servis (P_e + M_total, komposit) — Batas: −${n(0.45*material.fc,1)} MPa / +${n(0.50*Math.sqrt(material.fc),2)} MPa</div>
   <table class="data-table">
     <thead><tr style="background:#e0f2fe;font-size:7.5pt">
@@ -413,6 +460,11 @@ ${twoCol(
       row("φM_n = 0.90·M_n", kNm(uf.phiMn)) +
       row("M_u = 1.25DL + 1.75LL", kNm(uf.Mu))
     )}
+    ${calc3("M_n", "A_ps·f_ps·(d_p − a/2)",
+      `${n(Aps,1)} · ${n(uf.fps,1)} · (${n(hComp-(g.yb-e_mid),1)} − ${n(uf.a/2,1)})`,
+      `${kNm(uf.Mn)}`)}
+    ${calc3("φM_n", "0.90 · M_n",
+      `0.90 · ${n(uf.Mn,1)}`, `${kNm(uf.phiMn)}`)}
     <div class="check-row ${uf.isAdequate ? "" : "fail"}">
       <span class="check-label">φM_n ≥ M_u</span>
       <span class="check-value">${kNm(uf.phiMn)} ≥ ${kNm(uf.Mu)}</span>
@@ -785,6 +837,39 @@ ${lsl ? section("24. Estimasi Kehilangan Lump-Sum (Nilson §6.2, AASHTO §5.9.3.
     (${n(Math.abs(lsl.deltaFpLT - td.deltaFpLT)/Math.max(td.deltaFpLT,1)*100,1)}%).
     Refined dianjurkan untuk desain akhir.
   </div>
+`) : ""}
+
+${results.bsFlexure && results.bsShear && results.bsClass ? section("25. Metode BS 8110 — Kong & Evans Ch.9 (Pembanding Inggris)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Pendekatan British Standard sebagai pembanding ACI. Klasifikasi anggota Class 1/2/3,
+    blok tegangan persegi BS 8110, dan geser dua kasus Vco/Vcr. fcu (kubus) ≈ f'c/0.8.
+  </div>
+  ${twoCol(
+    `<div class="sub-title">§9.5 ULS Lentur</div>` +
+    table(
+      row("Kelas anggota BS", results.bsClass.description) +
+      row("σ tarik izin (layan)", MPa(results.bsClass.permTension)) +
+      row("fpuAps/(fcu·b·d)", n(results.bsFlexure.ratio,3)) +
+      row("fpe/fpu", n(results.bsFlexure.fpeRatio,3)) +
+      row("f_pb (tegangan tendon runtuh)", MPa(results.bsFlexure.fpb)) +
+      row("x (garis netral)", mm(results.bsFlexure.x)) +
+      row("Tendon", results.bsFlexure.bonded ? "bonded (Tabel 9.5-1)" : "unbonded (rumus)")
+    ) +
+    calc3("M_u (BS 8110)", "f_pb·A_ps·(d − 0.45x)",
+      `${n(results.bsFlexure.fpb,1)} · ${n(Aps,1)} · (${n(hComp-(g.yb-e_mid),1)} − 0.45·${n(results.bsFlexure.x,1)})`,
+      `${kNm(results.bsFlexure.Mu)}`),
+    `<div class="sub-title">§9.6 ULS Geser</div>` +
+    table(
+      row("f_t = 0.24√fcu", MPa(results.bsShear.ft)) +
+      row("M_0 = 0.8·f_pt·I/y", kNm(results.bsShear.M0)) +
+      row("Penampang", results.bsShear.isUncracked ? "TAK-RETAK (M<M₀)" : "RETAK (M≥M₀)")
+    ) +
+    calc3("V_co (tak-retak)", "0.67·b_v·h·√(f_t² + 0.8·f_cp·f_t)",
+      "", `${kN(results.bsShear.Vco)}`) +
+    calc3("V_cr (retak)", "(1−0.55·f_pe/f_pu)·v_c·b_v·d + M_0·V/M",
+      "", `${kN(results.bsShear.Vcr)}`) +
+    `<div class="check-row"><span class="check-label">V_c governing = ${results.bsShear.isUncracked ? "V_co" : "min(Vco,Vcr)"}</span><span class="check-value">${kN(results.bsShear.Vc)}</span><span>✓</span></div>`
+  )}
 `) : ""}
 
 ${cw ? section("Lebar Retak — Prategang Sebagian (ACI 224R-01 Gergely-Lutz)", twoCol(

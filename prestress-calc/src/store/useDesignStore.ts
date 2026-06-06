@@ -20,6 +20,7 @@ import { computeTorsion, estimateAcpPcp, estimateAohPh } from "@/engine/torsion"
 import { computeContinuousBeam, computeMomentRedistribution } from "@/engine/continuous";
 import { computeFlexuralStages } from "@/engine/flexuralstages";
 import { computeMCFT } from "@/engine/mcft";
+import { computeBSFlexure, computeBSShear, bsClassLimits } from "@/engine/bs8110";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -36,6 +37,7 @@ import type {
   AppSettings,
   UnitSystem,
   FormulaVariant,
+  PrestressSystem,
 } from "@/types";
 
 const LS_KEY = "prestress-calc-v3";
@@ -114,6 +116,7 @@ const defaultPartialPrestress: PartialPrestressConfig = {
 const defaultSettings: AppSettings = {
   unitSystem: "SI",
   formulaVariant: "STANDARD",
+  prestressSystem: "POST_TENSIONED", // prioritized default
 };
 
 // ─── Tendon resolver ─────────────────────────────────────────
@@ -153,6 +156,7 @@ interface DesignStore {
   // Settings
   setUnitSystem: (s: UnitSystem) => void;
   setFormulaVariant: (v: FormulaVariant) => void;
+  setPrestressSystem: (s: PrestressSystem) => void;
 
   // Persistence
   saveToLocal: () => void;
@@ -165,10 +169,21 @@ interface DesignStore {
 // ─── Computation pipeline ────────────────────────────────────
 
 function runPipeline(
-  inputs: ProjectInputs
+  inputs: ProjectInputs,
+  prestressSystem: PrestressSystem = "POST_TENSIONED"
 ): { results: DesignResults | null; errors: string[] } {
   const errors: string[] = [];
-  const { girder, deck, material, tendon, loads, immediateLoss, partialPrestress } = inputs;
+  const { girder, deck, material, tendon, loads, partialPrestress } = inputs;
+
+  // Construction-method differentiation (pretensioned vs post-tensioned):
+  //  - Pretensioned strands run straight in the bed with no duct ⇒ no curvature
+  //    or wobble friction, and all strands are released together (single ES group).
+  //  - Post-tensioned tendons sit in ducts ⇒ friction + anchorage draw-in, and
+  //    are stressed sequentially (ΔES factor (N−1)/2N).
+  const isPretensioned = prestressSystem === "PRETENSIONED";
+  const immediateLoss: ImmediateLossParams = isPretensioned
+    ? { ...inputs.immediateLoss, mu: 0, K: 0, numJackingGroups: 1 }
+    : inputs.immediateLoss;
 
   const hGirder = (girder.h1) + (girder.h5 ?? 0) + (girder.h2) + (girder.h4 ?? 0) + (girder.h3);
   if (hGirder <= 0) errors.push("Tinggi girder tidak valid.");
@@ -381,6 +396,28 @@ function runPipeline(
     fpi_lump, Aps, gross.areaAg, material.fci, loads.relativeHumidity
   );
 
+  // ── BS 8110 alternative (Kong & Evans Ch.9) ─────────────────
+  const hCompBS = gross.hTotal + deck.thicknessTd;
+  const dpBS    = hCompBS - (gross.yb - eccentricityMidspan);
+  const fcuApprox = material.fc / 0.8; // f'c (cylinder) ≈ 0.8·fcu (cube)
+  const bonded  = prestressSystem === "PRETENSIONED" || immediateLoss.mu > 0;
+  const bsFlexure = computeBSFlexure({
+    Aps, d: dpBS, b: deck.widthBeff, fcu: fcuApprox,
+    fpu: tendon.fpu, fpe: fse, bonded, L,
+    Mu_demand: Mu,
+  });
+  const fcp = (prestress.Pe * 1000) / gross.areaAg; // prestress at centroid (MPa)
+  const fpt = fcp + (prestress.Pe * 1000 * eccentricityMidspan * gross.yb) / gross.momentOfInertiaIg;
+  const bsShear = computeBSShear({
+    bv: girder.b2, h: gross.hTotal, d: dpBS, fcu: fcuApprox,
+    fcp, fpt, I: gross.momentOfInertiaIg, y: gross.yb,
+    fpe_fpu: fse / tendon.fpu, vc: 0.7, // vc default Table 6.4-1 (MPa)
+    V: VuShear, M: Mu,
+  });
+  const bsClass = bsClassLimits(
+    partialPrestress.enabled ? "3" : "1", fcuApprox, prestressSystem === "PRETENSIONED"
+  );
+
   // Partial Prestress Ratio (PPR)
   const PPR_val = ulsFlexure.fps > 0
     ? (Aps * ulsFlexure.fps) / (Aps * ulsFlexure.fps + Math.max(material.As, 0) * material.fy)
@@ -408,6 +445,9 @@ function runPipeline(
       mcftShear,
       momentRedistribution,
       lumpSumLosses,
+      bsFlexure,
+      bsShear,
+      bsClass,
       PPR: PPR_val,
     }),
     errors: [],
@@ -498,6 +538,10 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
   setFormulaVariant: (v) => {
     set((st) => ({ settings: { ...st.settings, formulaVariant: v } }));
   },
+  setPrestressSystem: (s) => {
+    set((st) => ({ settings: { ...st.settings, prestressSystem: s } }));
+    get().compute();
+  },
   saveToLocal: () => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
@@ -524,8 +568,9 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
       };
       const ps = parsed.settings ?? {};
       const mergedSettings: AppSettings = {
-        unitSystem:     ps.unitSystem     ?? defaultSettings.unitSystem,
-        formulaVariant: ps.formulaVariant ?? defaultSettings.formulaVariant,
+        unitSystem:      ps.unitSystem      ?? defaultSettings.unitSystem,
+        formulaVariant:  ps.formulaVariant  ?? defaultSettings.formulaVariant,
+        prestressSystem: ps.prestressSystem ?? defaultSettings.prestressSystem,
       };
       set({ inputs: merged, settings: mergedSettings });
       get().compute();
@@ -533,7 +578,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     } catch { return false; }
   },
   compute: () => {
-    const { results, errors } = runPipeline(get().inputs);
+    const { results, errors } = runPipeline(get().inputs, get().settings.prestressSystem);
     set({ results, errors });
   },
 }));

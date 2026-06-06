@@ -8,6 +8,10 @@ export type UnitSystem     = "SI" | "US";
 export type FormulaVariant = "STANDARD" | "KERNEL";
 export type PrestressType  = "FULL" | "PARTIAL";
 export type ACIBeamClass   = "U" | "T" | "C";
+/** Construction method — POST_TENSIONED is the prioritized default. */
+export type PrestressSystem = "PRETENSIONED" | "POST_TENSIONED";
+/** BS 8110 member class (Kong & Evans Ch.9) — parallel to ACIBeamClass. */
+export type BSMemberClass  = "1" | "2" | "3";
 
 // ─── Input Interfaces ────────────────────────────────────────
 
@@ -140,6 +144,8 @@ export interface ProjectInputs {
 export interface AppSettings {
   unitSystem: UnitSystem;
   formulaVariant: FormulaVariant;
+  /** Construction method — defaults to POST_TENSIONED (prioritized). */
+  prestressSystem: PrestressSystem;
 }
 
 // ─── Engine Result Interfaces ────────────────────────────────
@@ -394,6 +400,12 @@ export interface DesignResults {
   readonly momentRedistribution?: import("@/engine/continuous").MomentRedistributionResult;
   /** Lump-sum loss estimate (Nilson §6.2) — cross-check of refined losses */
   readonly lumpSumLosses?: import("@/engine/losses").LumpSumLossResult;
+  /** BS 8110 ULS flexure (Kong & Evans §9.5) — alternative to ACI */
+  readonly bsFlexure?: import("@/engine/bs8110").BSFlexureResult;
+  /** BS 8110 ULS shear (Kong & Evans §9.6) — Vco/Vcr */
+  readonly bsShear?: import("@/engine/bs8110").BSShearResult;
+  /** BS 8110 member-class permissible service stresses (§9.1) */
+  readonly bsClass?: import("@/engine/bs8110").BSClassLimits;
   /** Partial Prestress Ratio = Aps·fps / (Aps·fps + As·fy) */
   readonly PPR?: number;
 }

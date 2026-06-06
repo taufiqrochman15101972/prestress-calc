@@ -463,6 +463,34 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
         </>
       )}
 
+      {/* BS 8110 alternative (Kong & Evans §9.5-9.6) */}
+      {r.bsFlexure && r.bsShear && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            BS 8110 — Metode Inggris (Kong &amp; Evans §9.5–9.6)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="fpuAps/(fcu·b·d)" value={fmt(r.bsFlexure.ratio,3)} />
+            <ResultRow label="fpe/fpu" value={fmt(r.bsFlexure.fpeRatio,3)} />
+            <ResultRow label="f_pb (tegangan tendon runtuh)" value={fmt(r.bsFlexure.fpb)} unit="MPa" />
+            <ResultRow label="x (garis netral)" value={fmt(r.bsFlexure.x)} unit="mm" />
+            <ResultRow label="x/d" value={fmt(r.bsFlexure.x_d,3)} />
+            <ResultRow label="M_u = f_pb·Aps·(d−0.45x)" value={fmt(r.bsFlexure.Mu)} unit="kN·m" />
+            <ResultRow label={`Tendon: ${r.bsFlexure.bonded ? "bonded (Tabel 9.5-1)" : "unbonded (rumus)"}`} value="" />
+          </tbody></table>
+          <table className="w-full"><tbody>
+            <ResultRow label="f_t = 0.24√fcu" value={fmt(r.bsShear.ft,3)} unit="MPa" />
+            <ResultRow label="V_co (tak-retak)" value={fmt(r.bsShear.Vco)} unit="kN" />
+            <ResultRow label="M_0 (dekompresi)" value={fmt(r.bsShear.M0)} unit="kN·m" />
+            <ResultRow label="V_cr (retak)" value={fmt(r.bsShear.Vcr)} unit="kN" />
+            <ResultRow label={`V_c = ${r.bsShear.isUncracked ? "V_co" : "min(Vco,Vcr)"}`} value={fmt(r.bsShear.Vc)} unit="kN" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 -mt-1">
+            Penampang {r.bsShear.isUncracked ? "TAK-RETAK (M<M₀) → Vco governs" : "RETAK (M≥M₀)"} · fcu≈f'c/0.8.
+          </div>
+        </>
+      )}
+
       {/* Stirrup table */}
       <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Desain Sengkang (2 kaki)</p>
       <div className="text-[9px] text-gray-400 pl-1 mb-1">
