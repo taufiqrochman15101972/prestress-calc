@@ -121,13 +121,12 @@ export function computeCircularPrestress(inp: TankInputs): TankResult {
   const sigma_pe_correct = -(fse * (Aps_per_m / 1000)) / t; // MPa
 
   // ── Net hoop stress ────────────────────────────────────────
-  // Hoop stress from liquid: σ_hoop = N_h / t  [kN/m / mm = kN/(m·mm)]
-  // = N_h×1000 / (t×1000) = N_h/t [MPa]  (N_h in kN/m, t in mm)
-  const sigma_hoop_liq_base = (N_h_base) / t * 1000; // MPa (tension = positive)
-  // Wait: N_h [kN/m] on a wall section 1m wide × t thick:
-  // σ = N_h × 1000 N / (1000mm × t mm) = N_h/t [MPa]
+  // Hoop stress from liquid membrane force N_h [kN/m] over wall thickness t [mm]:
+  //   N_h [kN/m] = (N_h·1000 N)/(1000 mm) = N_h N/mm  ⇒  σ = N_h/t [N/mm² = MPa]
+  // (no extra ×1000 — kN/m and N/mm are numerically equal)
+  const sigma_hoop_liq_base = N_h_base / t; // MPa (tension = positive)
   const sigma_hoop_base = sigma_pe_correct + sigma_hoop_liq_base; // net hoop
-  const sigma_hoop_mid  = sigma_pe_correct + (N_h_mid) / t * 1000;
+  const sigma_hoop_mid  = sigma_pe_correct + N_h_mid / t;
 
   // ── Vertical bending (fixed base) ─────────────────────────
   // TY Lin: for short tank H²/(r·t) < 3: M_base = 0.19·p·r²·H

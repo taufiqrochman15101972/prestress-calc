@@ -24,8 +24,9 @@ export interface TransferLengthResult {
   readonly db: number;          // strand diameter (mm)
 }
 
-const PSI_PER_MPa = 145.0377;  // 1 MPa = 145.04 psi
-const IN_PER_MM   = 1 / 25.4;  // 1 mm = 0.03937 in
+// ACI 318-19 §25.8.8.1 uses ℓt = (fse/3)·db with fse in KSI, db in inches.
+// In SI this reduces to ℓt = fse·db / 20.7  (since 1 ksi = 6.895 MPa, ×3 = 20.685).
+const MPa_MM_PER_KSI_IN = 6.895 * 3; // ≈ 20.685 — converts (fse[MPa]·db[mm]) → ℓ[mm]
 
 /**
  * Compute transfer length and development length for prestressed strand.
@@ -39,14 +40,8 @@ export function computeTransferLength(
   fps_MPa: number,
   db_mm: number
 ): TransferLengthResult {
-  // Convert to US psi and inches for ACI formula, then convert result back to mm
-  const fse_psi = fse_MPa * PSI_PER_MPa;
-  const fps_psi = fps_MPa * PSI_PER_MPa;
-  const db_in   = db_mm  * IN_PER_MM;
-
-  // ACI 318-19 §25.8.8.1 (a): l_t = (f_se / 3) × d_b [psi, in]
-  const lt_in  = (fse_psi / 3) * db_in;
-  const lt_ACI = lt_in / IN_PER_MM;   // → mm
+  // ACI 318-19 §25.8.8.1 (a): ℓt = (fse/3)·db  →  SI: ℓt = fse·db / 20.7  [mm]
+  const lt_ACI = (fse_MPa * db_mm) / MPa_MM_PER_KSI_IN; // → mm
 
   // Conservative: 50 d_b
   const lt_50db = 50 * db_mm;
@@ -54,9 +49,9 @@ export function computeTransferLength(
   // Governing transfer length
   const lt_mm = Math.max(lt_ACI, lt_50db);
 
-  // ACI 318-19 §25.8.8.1 (b): l_d = l_t + (f_ps - f_se) / 3 × d_b [psi, in]
-  const ld_in = lt_in + ((fps_psi - fse_psi) / 3) * db_in;
-  const ld_mm = Math.max(ld_in / IN_PER_MM, lt_mm);
+  // ACI 318-19 §25.8.8.1 (b): ℓd = ℓt + (fps − fse)·db / 3  →  SI: /20.7
+  const ld_calc = lt_ACI + ((fps_MPa - fse_MPa) * db_mm) / MPa_MM_PER_KSI_IN;
+  const ld_mm = Math.max(ld_calc, lt_mm);
 
   return Object.freeze({
     lt_ACI,

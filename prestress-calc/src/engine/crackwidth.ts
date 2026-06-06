@@ -67,15 +67,12 @@ export function computeCrackWidth(inp: CrackWidthInputs): CrackWidthResult {
     exposure === "interior"   ? 0.33 :
     exposure === "exterior"   ? 0.25 : 0.15; // aggressive
 
-  // ACI 318-19 §24.3.2: maximum bar spacing (US psi/in formula, converted)
-  // s ≤ 380·(280/fs_psi) − 2.5·cc_in  [in]  →  convert back to mm
-  const IN_PER_MM = 1 / 25.4;
-  const PSI_PER_MPa = 145.0377;
-  const fs_psi  = fs * PSI_PER_MPa;
-  const cc_in   = dc * IN_PER_MM;
-  const s1_in   = 380 * (280 / fs_psi) - 2.5 * cc_in;
-  const s2_in   = 300 * (280 / fs_psi);
-  const sMax_ACI318 = Math.min(s1_in, s2_in) / IN_PER_MM; // → mm
+  // ACI 318-19 (SI) §24.3.2: maximum bar spacing — coefficients are already SI,
+  // used directly with fs [MPa] and cc [mm], giving s [mm]:
+  //   s ≤ 380·(280/fs) − 2.5·cc   and   s ≤ 300·(280/fs)
+  const s1   = 380 * (280 / fs) - 2.5 * dc; // mm
+  const s2   = 300 * (280 / fs);            // mm
+  const sMax_ACI318 = Math.min(s1, s2);     // mm
 
   return Object.freeze({
     w_cr,

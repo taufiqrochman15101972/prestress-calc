@@ -4,7 +4,7 @@
  * For non-circular sections under combined T + V + M.
  * Uses space-truss analogy with θ = 45° (non-PS) or 37.5° (PS).
  *
- * Threshold torque: T_th = λ√f'c/12 · Acp²/pcp · √(1 + fpc/(4√f'c))  [N·mm]
+ * Threshold torque: T_th = 0.083λ√f'c · Acp²/pcp · √(1 + fpc/(0.33λ√f'c))  [N·mm, SI]
  * Cracking torque:  T_cr = 4 · T_th
  * If Tu < φ · T_th → torsion may be neglected
  *
@@ -78,11 +78,12 @@ export function computeTorsion(inp: TorsionInputs): TorsionResult {
   const lambda = 1.0; // normal-weight concrete
   const sqrt_fc = Math.sqrt(fc);
 
-  // ── Threshold torque (N·mm) ──────────────────────────────────
+  // ── Threshold torque (N·mm) — ACI 318-19 (SI) §22.7.4.1 ─────
+  // T_th = 0.083·λ·√f'c·(Acp²/pcp)·√(1 + fpc/(0.33·λ·√f'c))
   const T_th_Nmm =
-    ((lambda * sqrt_fc) / 12) *
+    (0.083 * lambda * sqrt_fc) *
     ((Acp ** 2) / pcp) *
-    Math.sqrt(1 + fpc / (4 * sqrt_fc));
+    Math.sqrt(1 + fpc / (0.33 * lambda * sqrt_fc));
 
   const T_th  = T_th_Nmm / 1e6; // → kN·m
   const T_cr  = 4 * T_th;
@@ -110,13 +111,13 @@ export function computeTorsion(inp: TorsionInputs): TorsionResult {
     : (Tu_Nmm * ph * cot ** 2) / (2 * Ao * PHI_T * fyl);
 
   // ── Combined V + T check ─────────────────────────────────────
-  // ACI §22.7.7.1: (Vu/bw·dv)² + (Tu·ph/(1.7·Aoh²))² ≤ (Vc/bw·dv + 0.66λ√f'c)²
+  // ACI §22.7.7.1: √[(Vu/bw·dv)² + (Tu·ph/(1.7·Aoh²))²] ≤ φ·(Vc/bw·dv + 0.66λ√f'c)
   const Vu_N = Vu * 1000;       // kN → N
   const Vc_N = Vc * 1000;
   const v_shear = Vu_N / (bw * dv);
   const v_torsion = (Tu_Nmm * ph) / (1.7 * Aoh ** 2);
   const v_lhs = Math.sqrt(v_shear ** 2 + v_torsion ** 2);
-  const v_rhs = Vc_N / (bw * dv) + 0.66 * lambda * sqrt_fc;
+  const v_rhs = PHI_T * (Vc_N / (bw * dv) + 0.66 * lambda * sqrt_fc);
   const combinedRatio = v_rhs > 0 ? v_lhs / v_rhs : 0;
 
   return Object.freeze({
