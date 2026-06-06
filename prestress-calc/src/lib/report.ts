@@ -190,6 +190,7 @@ export function openPrintReport(
     continuousBeam: cb, PPR,
     flexuralStages: fst, mcftShear: mcft,
     momentRedistribution: mrd, lumpSumLosses: lsl,
+    thermal: thg, elongation: elo, preliminary: prl, pressureLine: pl,
   } = results;
 
   const h4 = girder.h4 ?? 0;
@@ -869,6 +870,115 @@ ${results.bsFlexure && results.bsShear && results.bsClass ? section("25. Metode 
     calc3("V_cr (retak)", "(1−0.55·f_pe/f_pu)·v_c·b_v·d + M_0·V/M",
       "", `${kN(results.bsShear.Vcr)}`) +
     `<div class="check-row"><span class="check-label">V_c governing = ${results.bsShear.isUncracked ? "V_co" : "min(Vco,Vcr)"}</span><span class="check-value">${kN(results.bsShear.Vc)}</span><span>✓</span></div>`
+  )}
+`) : ""}
+
+${prl ? section("26. Desain Pendahuluan — Gaya Prategang Minimum & Modulus Penampang (Libby Ch.9)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Pemilihan awal penampang & gaya prategang dari amplop tegangan izin (Libby §9-6..§9-8).
+    Membandingkan modulus penampang aktual terhadap modulus minimum yang disyaratkan.
+  </div>
+  ${twoCol(
+    `<div class="sub-title">Tegangan Izin</div>` +
+    table(
+      row("f_ci,c = 0.60 f'ci (tekan transfer)", MPa(prl.f_ci_c)) +
+      row("f_ti = 0.50√f'ci (tarik transfer)", MPa(prl.f_ti)) +
+      row("f_cs = 0.45 f'c (tekan layan)", MPa(prl.f_cs)) +
+      row("f_ts = 0.50√f'c (tarik layan)", MPa(prl.f_ts)) +
+      row("η = Pe/Pi (efektivitas)", n(p.Pe / Math.max(p.Pi, 1e-6), 3))
+    ),
+    `<div class="sub-title">Gaya Prategang Minimum</div>` +
+    calc3("P_min (layan, serat bawah)",
+      "(M_max/Z_b − f_ts) / (1/A + e_max/Z_b) ÷ η",
+      "", kN(prl.Pmin_service)) +
+    table(
+      row("P_min transfer (serat atas)", kN(prl.Pmin_transfer)) +
+      row("P_i aktual terpasang", kN(p.Pi)) +
+      row("Z_b minimum disyaratkan", `${sci(prl.Zb_req, 6)}`, "mm³") +
+      row("Z_b aktual", `${sci(g.Zbg, 6)}`, "mm³") +
+      row("Z_t minimum disyaratkan", `${sci(prl.Zt_req, 6)}`, "mm³") +
+      row("Z_t aktual", `${sci(g.Ztg, 6)}`, "mm³")
+    ) +
+    `<div class="check-row ${p.Pi >= prl.Pmin_service && g.Zbg >= prl.Zb_req ? "" : "fail"}">
+      <span class="check-label">P_i ≥ P_min  &  Z_b ≥ Z_b,req</span>
+      <span class="check-value">${kN(p.Pi)} / ${sci(g.Zbg,6)}</span>
+      <span>${check(p.Pi >= prl.Pmin_service && g.Zbg >= prl.Zb_req)}</span>
+    </div>`
+  )}
+`) : ""}
+
+${pl ? section("27. Garis Tekan (Pressure Line / C-line) — Libby §4-3..§4-5", `
+  <div class="info-box" style="margin-bottom:5px">
+    Resultan tekan internal C = P berpindah dari cgs sebesar M/P saat beban bekerja.
+    Selama garis-C berada di dalam kern (−k_t … +k_b), penampang penuh tertekan (tanpa tarik).
+  </div>
+  ${twoCol(
+    `<div class="sub-title">Lokasi Garis-C</div>` +
+    calc3("e_C (transfer)", "e − M_g/P_i",
+      `${n(e_mid,1)} − ${n(m.Mg,1)}·10³/${n(p.Pi,1)}`, mm(pl.eC_transfer)) +
+    calc3("e_C (layan)", "e − M_layan/P_e",
+      `${n(e_mid,1)} − ${n(m.Mservice,1)}·10³/${n(p.Pe,1)}`, mm(pl.eC_service)) +
+    calc3("Pergeseran garis tekan", "M_layan/P_e", "", mm(pl.shift)),
+    `<div class="sub-title">Batas Kern</div>` +
+    table(
+      row("Kern atas −k_t", mm(-g.kt)) +
+      row("Kern bawah +k_b", mm(g.kb)) +
+      row("e_C transfer dalam kern?", pl.withinKernTransfer ? "YA — tanpa tarik" : "TIDAK") +
+      row("e_C layan dalam kern?", pl.withinKernService ? "YA — penuh tekan" : "TIDAK (ada tarik serat)")
+    ) +
+    `<div class="check-row ${pl.withinKernTransfer ? "" : "fail"}">
+      <span class="check-label">Garis-C transfer ∈ kern</span>
+      <span class="check-value">${mm(pl.eC_transfer)} ∈ [${n(-g.kt,0)}, ${n(g.kb,0)}]</span>
+      <span>${check(pl.withinKernTransfer)}</span>
+    </div>`
+  )}
+`) : ""}
+
+${thg ? section("28. Tegangan Gradien Suhu — Self-Equilibrating (Libby §11-5 / AASHTO §3.12.3)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Gradien suhu non-linier menimbulkan tegangan swa-imbang (eigenstress) meski pada balok
+    sederhana, karena penampang harus tetap rata. T1=23 / T2=6 / T3=3 °C (Zona AASHTO, dapat diedit).
+  </div>
+  ${twoCol(
+    `<div class="sub-title">Parameter Gradien</div>` +
+    table(
+      row("T_avg (rata berbobot luas)", `${n(thg.Tavg,2)}`, "°C") +
+      row("ψ (kelengkungan termal)", `${n(thg.psi*1000,4)}`, "°C/m") +
+      row("N restraint (ujung terjepit)", kN(thg.N_restrained)) +
+      row("M restraint (ujung terjepit)", kNm(thg.M_restrained))
+    ),
+    `<div class="sub-title">Tegangan Serat Swa-imbang</div>` +
+    calc3("σ(y)", "E·α·[ T_avg + ψ(y−y_b) − T(y) ]", "", "") +
+    table(
+      row("σ serat atas", MPa(thg.sigmaTop)) +
+      row("σ centroid", MPa(thg.sigmaMid)) +
+      row("σ serat bawah", MPa(thg.sigmaBot))
+    ) +
+    `<div class="note-box">Tegangan ini DITAMBAHKAN pada tegangan SLS (§8). Positif = tarik.</div>`
+  )}
+`) : ""}
+
+${elo ? section("29. Elongasi Tendon & Gaya Dongkrak — Kendali Lapangan Pasca-Tarik (Libby §16-7)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Elongasi terukur adalah kontrol lapangan atas gaya prategang: Δ = ∫P(x)/(A_ps·E_ps)dx.
+    Hanya untuk metode PASCA-TARIK (post-tensioned).
+  </div>
+  ${twoCol(
+    `<div class="sub-title">Perhitungan Elongasi</div>` +
+    calc3("Δ_teoritis (tanpa friksi)", "P_j·L/(A_ps·E_ps)",
+      `${n(p.Pj,1)}·10³·${n(loads.spanLength,0)}/(${n(Aps,1)}·${n(tendon.Eps,0)})`,
+      mm(elo.deltaTheoretical)) +
+    calc3("Δ_friksi (integral profil)", "∫P(x)dx/(A_ps·E_ps)", "", mm(elo.deltaFriction)) +
+    calc3("Δ_neto (− set angkur)", "Δ_friksi − δ_set",
+      `${n(elo.deltaFriction,1)} − ${n(immediateLoss.deltaSet,1)}`, mm(elo.deltaNet)),
+    `<div class="sub-title">Gaya & Friksi</div>` +
+    table(
+      row("P_j (gaya dongkrak)", kN(p.Pj)) +
+      row("P_ujung-mati (setelah friksi)", kN(elo.Pend)) +
+      row("Kehilangan friksi", `${n(elo.frictionLossPct,2)}`, "%") +
+      (elo.gagePressureMPa > 0 ? row("Tekanan gage", MPa(elo.gagePressureMPa)) : "")
+    ) +
+    `<div class="note-box">Inspektor membaca Δ_neto pada ram. Toleransi lapangan umumnya ±7%.</div>`
   )}
 `) : ""}
 

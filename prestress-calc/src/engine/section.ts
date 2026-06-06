@@ -86,6 +86,23 @@ export function girderHeight(g: IGirderGeometry): number {
   return g.h1 + (g.h5 ?? 0) + g.h2 + (g.h4 ?? 0) + g.h3;
 }
 
+/**
+ * Section width b(y) at height y from the bottom fiber (mm).
+ * Linearly interpolates across trapezoidal fillets. Used by strip-integration
+ * routines (e.g. thermal gradient self-equilibrating stresses).
+ */
+export function widthAt(g: IGirderGeometry, y: number): number {
+  const traps = discretizeSection(g);
+  for (const t of traps) {
+    const yTop = t.bottomEdge + t.height;
+    if (y >= t.bottomEdge && y <= yTop) {
+      const f = t.height > 0 ? (y - t.bottomEdge) / t.height : 0;
+      return t.bottomWidth + (t.topWidth - t.bottomWidth) * f;
+    }
+  }
+  return 0;
+}
+
 // ─── Public API ──────────────────────────────────────────────
 
 /**

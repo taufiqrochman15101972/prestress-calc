@@ -21,6 +21,9 @@ import { computeContinuousBeam, computeMomentRedistribution } from "@/engine/con
 import { computeFlexuralStages } from "@/engine/flexuralstages";
 import { computeMCFT } from "@/engine/mcft";
 import { computeBSFlexure, computeBSShear, bsClassLimits } from "@/engine/bs8110";
+import { computeThermalGradient } from "@/engine/thermal";
+import { computeElongation } from "@/engine/elongation";
+import { computePreliminary, computePressureLine } from "@/engine/preliminary";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -418,6 +421,42 @@ function runPipeline(
     partialPrestress.enabled ? "3" : "1", fcuApprox, prestressSystem === "PRETENSIONED"
   );
 
+  // ── Libby "Modern Prestressed Concrete" additions ───────────
+  // §11-5 Thermal gradient self-equilibrating stresses (AASHTO §3.12.3).
+  const thermal = computeThermalGradient({
+    girder, gross, Ec,
+    alpha: 1.08e-5,           // normal-weight concrete (1/°C)
+    T1: 23, T2: 6, T3: 3,     // AASHTO Zone 3 positive gradient (user-editable defaults)
+  });
+
+  // §16-7 PT tendon elongation & gage force (post-tensioned field control).
+  const elongation = prestressSystem === "POST_TENSIONED"
+    ? computeElongation({
+        frictionProfile: prestress.frictionProfile,
+        Pj: prestress.Pj, spanMm: L, Aps,
+        Eps: material.Eps, deltaSet: immediateLoss.deltaSet,
+      })
+    : undefined;
+
+  // §9-6..§9-8 Preliminary design — min prestress force & section moduli.
+  const etaEff = prestress.Pi > 0 ? prestress.Pe / prestress.Pi : 0.82;
+  const preliminary = computePreliminary({
+    A: gross.areaAg, Zt: gross.Ztg, Zb: gross.Zbg, yb: gross.yb,
+    fci: material.fci, fc: material.fc,
+    Mmin: Mg, Mmax: Mservice,
+    eMax: Math.max(eccentricityMidspan, gross.yb - 100),
+    eta: etaEff,
+    // ACI Class U/T/C all permit some service tension; the allowable magnitude
+    // itself differentiates full vs partial in the SLS check.
+    allowTension: true,
+  });
+
+  // §4-3..§4-5 Pressure line / C-line migration through the kern.
+  const pressureLine = computePressureLine({
+    Pi: prestress.Pi, Pe: prestress.Pe, e: eccentricityMidspan,
+    Mg, Mservice, kt: gross.kt, kb: gross.kb,
+  });
+
   // Partial Prestress Ratio (PPR)
   const PPR_val = ulsFlexure.fps > 0
     ? (Aps * ulsFlexure.fps) / (Aps * ulsFlexure.fps + Math.max(material.As, 0) * material.fy)
@@ -448,6 +487,10 @@ function runPipeline(
       bsFlexure,
       bsShear,
       bsClass,
+      thermal,
+      elongation,
+      preliminary,
+      pressureLine,
       PPR: PPR_val,
     }),
     errors: [],

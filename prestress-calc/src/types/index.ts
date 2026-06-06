@@ -408,4 +408,12 @@ export interface DesignResults {
   readonly bsClass?: import("@/engine/bs8110").BSClassLimits;
   /** Partial Prestress Ratio = Aps·fps / (Aps·fps + As·fy) */
   readonly PPR?: number;
+  /** Thermal gradient self-equilibrating stresses (Libby §11-5 / AASHTO §3.12.3) */
+  readonly thermal?: import("@/engine/thermal").ThermalGradientResult;
+  /** PT tendon elongation & gage force for field control (Libby §16-7) */
+  readonly elongation?: import("@/engine/elongation").ElongationResult;
+  /** Preliminary design — min prestress force & section moduli (Libby §9-6..§9-8) */
+  readonly preliminary?: import("@/engine/preliminary").PreliminaryResult;
+  /** Pressure line / C-line migration (Libby §4-3..§4-5) */
+  readonly pressureLine?: import("@/engine/preliminary").PressureLineResult;
 }

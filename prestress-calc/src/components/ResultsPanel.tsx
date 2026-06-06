@@ -715,6 +715,84 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
           </div>
         </>
       )}
+
+      {/* Preliminary design — min prestress force (Libby Ch.9) */}
+      {r.preliminary && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Desain Pendahuluan — Gaya Prategang Min. (Libby §9-6..§9-8)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="P_min layan (serat bawah)" value={fmt(r.preliminary.Pmin_service)} unit="kN" />
+            <ResultRow label="P_i aktual terpasang" value={fmt(r.prestress.Pi)} unit="kN" />
+            <ResultRow label="Z_b minimum disyaratkan" value={(r.preliminary.Zb_req/1e6).toFixed(2)} unit="×10⁶mm³" />
+            <ResultRow label="Z_b aktual" value={(r.gross.Zbg/1e6).toFixed(2)} unit="×10⁶mm³" />
+            <ResultRow label="Z_t minimum disyaratkan" value={(r.preliminary.Zt_req/1e6).toFixed(2)} unit="×10⁶mm³" />
+          </tbody></table>
+          <table className="w-full mt-1"><tbody>
+            <CheckRow label="P_i ≥ P_min & Z_b ≥ Z_b,req"
+              value={fmt(r.prestress.Pi)}
+              limit={fmt(r.preliminary.Pmin_service)}
+              ok={r.prestress.Pi >= r.preliminary.Pmin_service && r.gross.Zbg >= r.preliminary.Zb_req} unit="kN" />
+          </tbody></table>
+        </>
+      )}
+
+      {/* Pressure line / C-line (Libby §4) */}
+      {r.pressureLine && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Garis Tekan (Pressure Line / C-line) — Libby §4-3..§4-5
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="e_C transfer = e − Mg/Pi" value={fmt(r.pressureLine.eC_transfer,0)} unit="mm" />
+            <ResultRow label="e_C layan = e − M/Pe" value={fmt(r.pressureLine.eC_service,0)} unit="mm" />
+            <ResultRow label="Pergeseran = M/Pe" value={fmt(r.pressureLine.shift,0)} unit="mm" />
+            <ResultRow label="Kern band (−kt … +kb)" value={`${fmt(-r.gross.kt,0)} … ${fmt(r.gross.kb,0)}`} unit="mm" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 mt-0.5">
+            Garis-C transfer {r.pressureLine.withinKernTransfer ? "✓ di dalam kern (tanpa tarik)" : "✗ keluar kern"} ·
+            layan {r.pressureLine.withinKernService ? "✓ penuh tekan" : "ada tarik serat"}.
+          </div>
+        </>
+      )}
+
+      {/* Thermal gradient (Libby §11-5) */}
+      {r.thermal && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Gradien Suhu — Tegangan Swa-imbang (Libby §11-5 / AASHTO §3.12.3)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="T_avg (rata berbobot luas)" value={fmt(r.thermal.Tavg,2)} unit="°C" />
+            <ResultRow label="σ serat atas" value={fmt(r.thermal.sigmaTop,2)} unit="MPa" />
+            <ResultRow label="σ centroid" value={fmt(r.thermal.sigmaMid,2)} unit="MPa" />
+            <ResultRow label="σ serat bawah" value={fmt(r.thermal.sigmaBot,2)} unit="MPa" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 mt-0.5">
+            T1=23/T2=6/T3=3°C (Zona AASHTO). Positif = tarik. Ditambahkan ke tegangan SLS.
+          </div>
+        </>
+      )}
+
+      {/* PT elongation & gage (Libby §16-7) */}
+      {r.elongation && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Elongasi Tendon & Kendali Lapangan PT (Libby §16-7)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="Δ teoritis (tanpa friksi)" value={fmt(r.elongation.deltaTheoretical,1)} unit="mm" />
+            <ResultRow label="Δ friksi (integral profil)" value={fmt(r.elongation.deltaFriction,1)} unit="mm" />
+            <ResultRow label="Δ neto (− set angkur)" value={fmt(r.elongation.deltaNet,1)} unit="mm" />
+            <ResultRow label="P_ujung-mati (setelah friksi)" value={fmt(r.elongation.Pend)} unit="kN" />
+            <ResultRow label="Kehilangan friksi" value={fmt(r.elongation.frictionLossPct,2)} unit="%" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 mt-0.5">
+            Inspektor membaca Δ_neto pada ram (toleransi ±7%). Hanya untuk PASCA-TARIK.
+          </div>
+        </>
+      )}
     </div>
   );
 }
