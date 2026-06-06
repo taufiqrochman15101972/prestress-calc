@@ -428,4 +428,6 @@ export interface DesignResults {
   readonly preliminary?: import("@/engine/preliminary").PreliminaryResult;
   /** Pressure line / C-line migration (Libby §4-3..§4-5) */
   readonly pressureLine?: import("@/engine/preliminary").PressureLineResult;
+  /** Eurocode 2 (EN 1992-1-1) design code — M.K. Hurst 2nd ed. */
+  readonly ec2?: import("@/engine/ec2").EC2Result;
 }

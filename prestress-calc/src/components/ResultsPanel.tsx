@@ -809,6 +809,32 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
           </div>
         </>
       )}
+
+      {/* Eurocode 2 (EN 1992-1-1) — M.K. Hurst */}
+      {r.ec2 && (
+        <>
+          <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+            Eurocode 2 (EN 1992-1-1) — M.K. Hurst (Pembanding Eropa)
+          </p>
+          <table className="w-full"><tbody>
+            <ResultRow label="f_cd = α_cc·f_ck/γ_c" value={fmt(r.ec2.material.fcd)} unit="MPa" />
+            <ResultRow label="f_ctm" value={fmt(r.ec2.material.fctm)} unit="MPa" />
+            <ResultRow label="E_cm" value={fmt(r.ec2.material.Ecm,0)} unit="MPa" />
+            <ResultRow label="f_pd = 0.9·f_pk/γ_s" value={fmt(r.ec2.material.fpd)} unit="MPa" />
+            <ResultRow label="η / λ (blok tegangan)" value={`${fmt(r.ec2.material.eta,3)} / ${fmt(r.ec2.material.lambda,3)}`} />
+            <ResultRow label="σ_c ≤ 0.45f_ck (quasi-perm.)" value={fmt(r.ec2.stressLimits.compQuasiPermanent)} unit="MPa" />
+            <ResultRow label="Δσ_p,c+s+r (§5.10.6 gabungan)" value={fmt(r.ec2.loss.deltaSigma_csr)} unit="MPa" />
+            <ResultRow label="M_Rd (§6.1 blok persegi)" value={fmt(r.ec2.flexure.MRd)} unit="kN·m" />
+            <ResultRow label="x/d (daktilitas ≤0.45)" value={fmt(r.ec2.flexure.x_d,3)} />
+            <ResultRow label={`V_Rd,c (${r.ec2.shear.region === "uncracked" ? "tak-retak" : "retak"})`} value={fmt(r.ec2.shear.VRd_c)} unit="kN" />
+            <ResultRow label="V_Rd,max (rangka θ=21.8°)" value={fmt(r.ec2.shear.VRd_max)} unit="kN" />
+          </tbody></table>
+          <div className="text-[9px] text-gray-400 pl-1 mt-0.5">
+            Jalur kode keempat (paralel ACI/AASHTO &amp; BS 8110). Kehilangan jangka-panjang EC2
+            menggabungkan susut+rangkak+relaksasi dalam satu persamaan (eq 5.46).
+          </div>
+        </>
+      )}
     </div>
   );
 }

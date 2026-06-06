@@ -191,6 +191,7 @@ export function openPrintReport(
     flexuralStages: fst, mcftShear: mcft,
     momentRedistribution: mrd, lumpSumLosses: lsl,
     thermal: thg, elongation: elo, preliminary: prl, pressureLine: pl,
+    ec2,
   } = results;
 
   const h4 = girder.h4 ?? 0;
@@ -998,6 +999,74 @@ ${elo ? section("29. Elongasi Tendon & Gaya Dongkrak — Kendali Lapangan Pasca-
       (elo.gagePressureMPa > 0 ? row("Tekanan gage", MPa(elo.gagePressureMPa)) : "")
     ) +
     `<div class="note-box">Inspektor membaca Δ_neto pada ram. Toleransi lapangan umumnya ±7%.</div>`
+  )}
+`) : ""}
+
+${ec2 ? section("30. Metode Eurocode 2 (EN 1992-1-1) — M.K. Hurst (Pembanding Eropa)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Jalur kode keempat (paralel dengan ACI/AASHTO &amp; BS 8110). Nilai desain bahan EC2,
+    batas tegangan per kombinasi beban, kehilangan jangka-panjang gabungan satu-persamaan
+    (§5.10.6), lentur blok persegi (λx, η·f_cd), dan geser dua-wilayah + rangka sudut-variabel.
+    f_ck = kekuatan silinder = f'c.
+  </div>
+  ${twoCol(
+    `<div class="sub-title">Nilai Desain Bahan (Tabel 3.1)</div>` +
+    calc3("f_cd = α_cc·f_ck/γ_c", "0.85·f_ck/1.5",
+      `0.85·${n(material.fc,0)}/1.5`, MPa(ec2.material.fcd)) +
+    calc3("f_ctm", material.fc <= 50 ? "0.30·f_ck^(2/3)" : "2.12·ln(1+f_cm/10)",
+      "", MPa(ec2.material.fctm)) +
+    calc3("E_cm", "22·(f_cm/10)^0.3 [GPa]",
+      `22·(${n(ec2.material.fcm,0)}/10)^0.3`, `${n(ec2.material.Ecm,0)} MPa`) +
+    calc3("f_pd = 0.9·f_pk/γ_s", "0.9·f_pk/1.15",
+      `0.9·${n(tendon.fpu,0)}/1.15`, MPa(ec2.material.fpd)) +
+    table(
+      row("η (faktor kekuatan efektif)", n(ec2.material.eta,3)) +
+      row("λ (faktor tinggi blok)", n(ec2.material.lambda,3)) +
+      row("ν₁ (reduksi geser retak)", n(ec2.material.nu1,3))
+    ) +
+    `<div class="sub-title" style="margin-top:6px">Batas Tegangan (§7.2)</div>` +
+    table(
+      row("σ_c transfer ≤ 0.6·f_ck(t)", MPa(ec2.stressLimits.compTransfer)) +
+      row("σ_c layan ≤ 0.6·f_ck (rare)", MPa(ec2.stressLimits.compCharacteristic)) +
+      row("σ_c ≤ 0.45·f_ck (quasi-permanen)", MPa(ec2.stressLimits.compQuasiPermanent)) +
+      row("σ_t layan ≤ f_ctm", MPa(ec2.stressLimits.tensService))
+    ),
+    `<div class="sub-title">§5.10.6 Kehilangan Jangka-Panjang Gabungan</div>` +
+    calc3("Δσ_p,c+s+r",
+      "[ε_cs·E_p + 0.8·Δσ_pr + (E_p/E_cm)·φ·σ_c,QP] / [1 + (E_p/E_cm)(A_p/A_c)(1+A_c·z²/I_c)(1+0.8φ)]",
+      "", MPa(ec2.loss.deltaSigma_csr)) +
+    table(
+      row("Suku susut ε_cs·E_p", MPa(ec2.loss.shrinkageTerm)) +
+      row("Suku relaksasi 0.8·Δσ_pr", MPa(ec2.loss.relaxationTerm)) +
+      row("Suku rangkak (E_p/E_cm)·φ·σ_c,QP", MPa(ec2.loss.creepTerm)) +
+      row("Penyebut (ageing/restraint)", n(ec2.loss.denominator,4))
+    ) +
+    `<div class="sub-title" style="margin-top:6px">§6.1 ULS Lentur</div>` +
+    calc3("x = A_p·f_pd/(η·f_cd·λ·b)", "",
+      `${n(Aps,0)}·${n(ec2.flexure.fpd,0)}/(${n(ec2.flexure.eta,2)}·${n(ec2.flexure.fcd,1)}·${n(ec2.flexure.lambda,2)}·${n(deck.widthBeff,0)})`,
+      mm(ec2.flexure.x)) +
+    calc3("M_Rd = A_p·f_pd·(d − λx/2)", "",
+      `${n(Aps,0)}·${n(ec2.flexure.fpd,0)}·(${n(hComp-(g.yb-e_mid),0)} − ${n(ec2.flexure.a/2,0)})`,
+      kNm(ec2.flexure.MRd)) +
+    `<div class="check-row ${ec2.flexure.isAdequate ? "" : "fail"}">
+      <span class="check-label">M_Rd ≥ M_Ed &amp; x/d ≤ 0.45 (daktail)</span>
+      <span class="check-value">${kNm(ec2.flexure.MRd)} · x/d=${n(ec2.flexure.x_d,3)}</span>
+      <span>${check(ec2.flexure.isAdequate && ec2.flexure.ductile)}</span>
+    </div>` +
+    `<div class="sub-title" style="margin-top:6px">§6.2 Geser</div>` +
+    table(
+      row("Wilayah", ec2.shear.region === "uncracked" ? "TAK-RETAK lentur (eq 6.4)" : "RETAK lentur (eq 6.2a)") +
+      row("V_Rd,c (tak-retak)", kN(ec2.shear.VRd_c_uncracked)) +
+      row("V_Rd,c (retak)", kN(ec2.shear.VRd_c_cracked)) +
+      row("V_Rd,c governing", kN(ec2.shear.VRd_c)) +
+      row("V_Rd,max (rangka, θ=21.8°)", kN(ec2.shear.VRd_max)) +
+      row("α_cw (peningkatan prategang)", n(ec2.shear.alpha_cw,3))
+    ) +
+    `<div class="check-row ${ec2.shear.isAdequate ? "" : "fail"}">
+      <span class="check-label">${ec2.shear.needsLinks ? "Perlu sengkang (V_Ed > V_Rd,c)" : "Tanpa sengkang (V_Ed ≤ V_Rd,c)"} · badan tak hancur</span>
+      <span class="check-value">V_Rd,max = ${kN(ec2.shear.VRd_max)}</span>
+      <span>${check(ec2.shear.isAdequate)}</span>
+    </div>`
   )}
 `) : ""}
 

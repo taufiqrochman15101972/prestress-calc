@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { calculateGrossProperties, calculateCompositeProperties } from "@/engine/section";
+import { calculateGrossProperties, calculateCompositeProperties, widthAt } from "@/engine/section";
 import { tendonProfile, computePrestressForces } from "@/engine/tendon";
 import { computeTimeDependentLosses, computeLumpSumLosses } from "@/engine/losses";
 import { computeSLSChecks } from "@/engine/sls";
@@ -24,6 +24,9 @@ import { computeBSFlexure, computeBSShear, bsClassLimits } from "@/engine/bs8110
 import { computeThermalGradient } from "@/engine/thermal";
 import { computeElongation } from "@/engine/elongation";
 import { computePreliminary, computePressureLine } from "@/engine/preliminary";
+import {
+  ec2Material, ec2StressLimits, ec2TimeDependentLoss, ec2Flexure, ec2Shear,
+} from "@/engine/ec2";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -430,6 +433,59 @@ function runPipeline(
     partialPrestress.enabled ? "3" : "1", fcuApprox, prestressSystem === "PRETENSIONED"
   );
 
+  // ── Eurocode 2 (EN 1992-1-1) — M.K. Hurst "Prestressed Concrete Design" ──
+  // Fourth code path, parallel to ACI/AASHTO and BS 8110. fck = cylinder
+  // strength = material.fc (the suite already stores cylinder values).
+  const ec2Mat = ec2Material(material.fc, tendon.fpu);
+  const ec2Limits = ec2StressLimits(material.fc, material.fci);
+
+  // §5.10.6 combined time-dependent loss — couple the three effects.
+  // εcs recovered from the shrinkage stress loss already computed; relaxation
+  // from ΔfpR2; creep coefficient φ from a typical RH-based default.
+  const eps_cs = material.Eps > 0 ? tdLosses.deltaFpSR / material.Eps : 0;
+  const phiCreep = 2.4 * (1 - loads.relativeHumidity / 100) + 1.0; // ≈1.7–2.4
+  // Concrete stress at tendon level under quasi-permanent loads (+ = comp):
+  const Mqp_Nmm = (Mg + Msdl + 0.3 * Mlive) * 1e6;
+  const Ig = gross.momentOfInertiaIg;
+  const sigma_c_qp = (prestress.Pe * 1000) / gross.areaAg
+    + (prestress.Pe * 1000 * eccentricityMidspan * eccentricityMidspan) / Ig
+    - (Mqp_Nmm * eccentricityMidspan) / Ig;
+  const ec2Loss = ec2TimeDependentLoss({
+    eps_cs, Ep: material.Eps, Ecm: ec2Mat.Ecm,
+    delta_pr: tdLosses.deltaFpR2, phi: phiCreep,
+    sigma_c_qp: Math.max(sigma_c_qp, 0),
+    Ap: Aps, Ac: gross.areaAg, Ic: Ig, zcp: eccentricityMidspan,
+  });
+
+  // §6.1 ULS flexure (rectangular block).
+  const ec2Flex = ec2Flexure({
+    Ap: Aps, d: dpBS, b: deck.widthBeff,
+    fck: material.fc, fpk: tendon.fpu, Mu_demand: Mu,
+  });
+
+  // §6.2 shear — first moment of area Q above the centroid via strip integration.
+  let Q_centroid = 0;
+  const nStrip = 40, dyStrip = gross.yt / nStrip;
+  for (let i = 0; i < nStrip; i++) {
+    const y = gross.yb + (i + 0.5) * dyStrip; // above centroid
+    Q_centroid += widthAt(girder, y) * (y - gross.yb) * dyStrip;
+  }
+  const rho_l = (material.As + Aps) / (girder.b2 * dpBS);
+  const ec2Shr = ec2Shear({
+    bw: girder.b2, d: dpBS, h: gross.hTotal,
+    fck: material.fc, fpk: tendon.fpu,
+    I: Ig, S: Q_centroid, sigma_cp: fcp,
+    rho_l, V: VuShear, M: Mu, Mcr,
+  });
+
+  const ec2 = {
+    material: ec2Mat,
+    stressLimits: ec2Limits,
+    loss: ec2Loss,
+    flexure: ec2Flex,
+    shear: ec2Shr,
+  };
+
   // ── Libby "Modern Prestressed Concrete" additions ───────────
   // §11-5 Thermal gradient self-equilibrating stresses (AASHTO §3.12.3).
   const thermal = computeThermalGradient({
@@ -500,6 +556,7 @@ function runPipeline(
       elongation,
       preliminary,
       pressureLine,
+      ec2,
       PPR: PPR_val,
     }),
     errors: [],
