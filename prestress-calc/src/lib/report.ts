@@ -585,26 +585,45 @@ ${section("14. Panjang Transfer & Pengembangan — ACI 318-19 §25.8.8", twoCol(
   </div>`
 ))}
 
-${section("15. Zona Angkur — Bursting & Spalling (AASHTO LRFD §5.10.9.3)", twoCol(
-  `<div class="sub-title">Gaya Bursting & Spalling</div>` +
-  table(
-    row("P_i (gaya transfer)", kN(p.Pi)) +
-    row("H_girder (h)", mm(hGirder)) +
-    row("e_end (eksentrisitas angkur)", mm(tendon.eccentricitySupport)) +
-    row("a (tinggi pelat angkur ≈ 0.25H)", `${n(Math.min(hGirder*0.25,300),0)}`, "mm") +
-    row("T_burst = 0.25·P_i·(1−a/h)", kN(az.T_burst)) +
-    row("d_burst = 0.5·(h−2|e|)", mm(az.d_burst)) +
-    row("A_st burst = T_burst/(φ·f_y)", mm2(az.Ast_burst)) +
-    row("T_spall = 0.02·P_i (AASHTO)", kN(az.T_spall)) +
-    row("A_st spalling", mm2(az.Ast_spall)) +
-    (az.T_edge > 0 ? row("T_edge (eksentrisitas)", kN(az.T_edge)) + row("A_st edge", mm2(az.Ast_edge)) : "")
-  ),
-  `<div class="note-box">
-    <strong>Zona angkur</strong> (daerah D/B): distribusi tegangan berubah drastis dalam jarak ≈ H dari muka tumpuan. Tulangan sengkang tertutup (closed stirrups/ties) harus dipasang dalam d_burst untuk menahan T_burst.<br><br>
-    <strong>Desain:</strong><br>
-    Pasang ${Math.ceil(az.Ast_burst / (2 * Math.PI * 100 / 4) * 10) / 10} Ø10 (2 kaki) dalam zona d_burst = ${n(az.d_burst,0)} mm dari muka angkur.
-  </div>`
-))}
+${section("15. Zona Angkur Pasca-Tarik — Local & General Zone (NCHRP 356 / AASHTO §5.8.4)", `
+  <div class="info-box" style="margin-bottom:5px">
+    Metode strut-and-tie NCHRP 356 (Breen dkk.). <strong>Local zone</strong> = beton di sekitar
+    angkur (tumpu + kekangan); <strong>General zone</strong> = penyebaran gaya tendon (tie bursting).
+    Metode pendekatan ${az.approxMethodApplicable ? "BERLAKU" : "TIDAK berlaku — perlu STM/FEM eksplisit"} (a/h≤0.5, |e|≤h/2).
+  </div>
+  ${twoCol(
+    `<div class="sub-title">General Zone — Tie Bursting & Spalling</div>` +
+    calc3("T_burst", "0.25·ΣP·(1 − a/h) + 0.5·|ΣP·sinα|",
+      `0.25·${n(p.Pi,0)}·(1 − ${n(Math.min(hGirder*0.25,300),0)}/${n(hGirder,0)}) + 0.5·|${n(p.Pi,0)}·sin${n(az.alphaDeg,1)}°|`,
+      kN(az.T_burst)) +
+    calc3("d_burst", "0.5·(h − 2|e|) + 5·e·sinα", "", mm(az.d_burst)) +
+    table(
+      row("A_st burst = T_burst/(φ·f_y)", mm2(az.Ast_burst)) +
+      row("T_spall = 0.02·ΣP", kN(az.T_spall)) +
+      row("A_st spalling", mm2(az.Ast_spall)) +
+      (az.T_edge > 0 ? row("T_edge longitudinal = P·e/(2h)", kN(az.T_edge)) + row("A_st edge", mm2(az.Ast_edge)) : "")
+    ) +
+    `<div class="note-box">Pasang ≈${Math.ceil(az.Ast_burst / (2 * Math.PI * 100 / 4) * 10) / 10} Ø10 (2 kaki) tertutup dalam d_burst = ${n(az.d_burst,0)} mm dari muka angkur.</div>`,
+
+    `<div class="sub-title">Local Zone — Tumpu & Kekangan</div>` +
+    calc3("f_b (tegangan tumpu)", "P_dev / A_plate", "", MPa(az.bearingStress)) +
+    calc3("f_b,izin", "0.7·f'ci·√(A/A_g) ≤ 2.25·f'ci",
+      `0.7·${n(material.fci,0)}·${n(az.confinementRatio,2)}`, MPa(az.bearingAllow)) +
+    calc3("P_r = φ·f_b,izin·A_plate", "φ=0.65", "", kN(az.bearingResistance)) +
+    `<div class="check-row ${az.bearingOk ? "" : "fail"}">
+      <span class="check-label">Tumpu local zone: P_dev ≤ P_r</span>
+      <span class="check-value">${kN(az.Pdev)} ≤ ${kN(az.bearingResistance)}</span>
+      <span>${check(az.bearingOk)}</span>
+    </div>` +
+    `<div class="sub-title" style="margin-top:6px">Tegangan Tekan di Depan Angkur</div>` +
+    calc3("σ_c", "ΣP/(b·h)", "", MPa(az.compStressAhead)) +
+    `<div class="check-row ${az.compOk ? "" : "fail"}">
+      <span class="check-label">σ_c ≤ 0.6·f'ci</span>
+      <span class="check-value">${MPa(az.compStressAhead)} ≤ ${MPa(az.compLimit)}</span>
+      <span>${check(az.compOk)}</span>
+    </div>`
+  )}
+`)}
 
 ${PPR !== undefined ? section("16. Partial Prestress Ratio (PPR)", `
   ${twoCol(

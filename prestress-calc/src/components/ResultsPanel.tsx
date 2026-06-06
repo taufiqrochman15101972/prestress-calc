@@ -622,20 +622,36 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
         <ResultRow label="l_t / db" value={r.transferLength.lt_db.toFixed(1)} />
       </tbody></table>
 
-      {/* Anchorage Zone */}
-      <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Zona Angkur — Bursting &amp; Spalling</p>
+      {/* Anchorage Zone — NCHRP 356 / AASHTO §5.8.4 (local + general zone) */}
+      <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Zona Angkur PT — Local & General Zone (NCHRP 356)</p>
       <div className="text-[9px] text-gray-400 pl-1 mb-1">
-        AASHTO §5.10.9.3 / Guts method
+        Strut-and-tie Breen dkk. · AASHTO §5.8.4 · {r.anchorageZone.approxMethodApplicable ? "metode pendekatan berlaku" : "perlu STM/FEM eksplisit"}
       </div>
       <table className="w-full"><tbody>
-        <ResultRow label="T_burst (bursting force)" value={fmt(r.anchorageZone.T_burst)} unit="kN" />
+        <ResultRow label="α inklinasi tendon" value={fmt(r.anchorageZone.alphaDeg,2)} unit="°" />
+        <ResultRow label="T_burst = 0.25P(1−a/h)+0.5|Psinα|" value={fmt(r.anchorageZone.T_burst)} unit="kN" />
         <ResultRow label="d_burst (zona)" value={fmt(r.anchorageZone.d_burst,0)} unit="mm" />
         <ResultRow label="Ast_burst (ties req.)" value={fmt(r.anchorageZone.Ast_burst,0)} unit="mm²" />
-        <ResultRow label="T_spall (AASHTO 2%)" value={fmt(r.anchorageZone.T_spall)} unit="kN" />
-        <ResultRow label="Ast_spall" value={fmt(r.anchorageZone.Ast_spall,0)} unit="mm²" />
+        <ResultRow label="T_spall (2%) / Ast" value={`${fmt(r.anchorageZone.T_spall)} / ${fmt(r.anchorageZone.Ast_spall,0)}`} unit="kN/mm²" />
         {r.anchorageZone.T_edge > 0 && (
-          <ResultRow label="T_edge (eksentrisitas)" value={fmt(r.anchorageZone.T_edge)} unit="kN" />
+          <ResultRow label="T_edge longitudinal" value={fmt(r.anchorageZone.T_edge)} unit="kN" />
         )}
+      </tbody></table>
+      <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">Local Zone — Tumpu & Kekangan</p>
+      <table className="w-full"><tbody>
+        <ResultRow label="f_b tegangan tumpu" value={fmt(r.anchorageZone.bearingStress,2)} unit="MPa" />
+        <ResultRow label="√(A/Ag) kekangan" value={fmt(r.anchorageZone.confinementRatio,2)} />
+        <ResultRow label="f_b,izin = 0.7f'ci√(A/Ag)" value={fmt(r.anchorageZone.bearingAllow,2)} unit="MPa" />
+        <ResultRow label="P_r resistansi tumpu" value={fmt(r.anchorageZone.bearingResistance)} unit="kN" />
+        <ResultRow label="σ_c depan angkur / 0.6f'ci" value={`${fmt(r.anchorageZone.compStressAhead,2)} / ${fmt(r.anchorageZone.compLimit,2)}`} unit="MPa" />
+      </tbody></table>
+      <table className="w-full mt-1"><tbody>
+        <CheckRow label="Tumpu local zone P_dev ≤ P_r"
+          value={fmt(r.anchorageZone.Pdev)} limit={fmt(r.anchorageZone.bearingResistance)}
+          ok={r.anchorageZone.bearingOk} unit="kN" />
+        <CheckRow label="σ_c ≤ 0.6·f'ci"
+          value={fmt(r.anchorageZone.compStressAhead,2)} limit={fmt(r.anchorageZone.compLimit,2)}
+          ok={r.anchorageZone.compOk} unit="MPa" />
       </tbody></table>
 
       {/* Crack width (partial prestress only) */}

@@ -350,6 +350,18 @@ export interface AnchorageZoneResult {
   readonly Ast_spall: number;
   readonly T_edge: number;
   readonly Ast_edge: number;
+  // NCHRP 356 / AASHTO §5.8.4 — local zone & general-zone extras
+  readonly alphaDeg: number;
+  readonly Pdev: number;
+  readonly bearingStress: number;
+  readonly confinementRatio: number;
+  readonly bearingAllow: number;
+  readonly bearingResistance: number;
+  readonly bearingOk: boolean;
+  readonly compStressAhead: number;
+  readonly compLimit: number;
+  readonly compOk: boolean;
+  readonly approxMethodApplicable: boolean;
 }
 
 export interface CrackWidthResult {

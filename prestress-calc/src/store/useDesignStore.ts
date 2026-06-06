@@ -306,12 +306,21 @@ function runPipeline(
     fse, ulsFlexure.fps, tendon.strandDiameter
   );
 
-  // Anchorage zone (end zone, post-tensioned)
+  // Anchorage zone (end zone, post-tensioned) — NCHRP 356 / AASHTO §5.8.4.
+  // Inclination of the tendon at the support governs the bursting term; for a
+  // post-tensioned multi-tendon system the force is shared between devices.
+  const anchorPlate = Math.min(gross.hTotal * 0.25, 300);
+  const nTendons = Math.max(1, Math.round(totalStrands / 19)); // ~19-strand units
   const anchorageZone = computeAnchorageZone({
     Pi: prestress.Pi,
     hTotal: gross.hTotal,
     eEnd: tendon.eccentricitySupport,
-    anchorPlateHeight: Math.min(gross.hTotal * 0.25, 300),
+    anchorPlateHeight: anchorPlate,
+    anchorPlateWidth: anchorPlate,
+    sectionWidth: Math.max(girder.b2, girder.b3 * 0.5),
+    fci: material.fci,
+    tendonInclination: (thetaSupport * 180) / Math.PI,
+    nAnchors: prestressSystem === "POST_TENSIONED" ? nTendons : 1,
     fy: material.fy,
   });
 
