@@ -10,8 +10,9 @@ import { CorbelCalculator } from "@/components/CorbelCalculator";
 import { DappedEndCalculator } from "@/components/DappedEndCalculator";
 import { BearingCalculator } from "@/components/BearingCalculator";
 import { SlabOnGradeCalculator } from "@/components/SlabOnGradeCalculator";
+import { BoxGirderCalculator } from "@/components/BoxGirderCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box";
 
 interface Props {
   open: boolean;
@@ -73,6 +74,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Pelat di Atas Tanah (PT)",
     subtitle: "Slab-on-grade — Westergaard, ℓ, friksi tanah, bebas retak (Khan §11)",
   },
+  {
+    key: "box",
+    emoji: "🌉",
+    title: "Box Girder Jembatan",
+    subtitle: "Torsi sel tertutup (Bredt), distribusi beban eksentris ke web, desain komponen (Menn Ch.5)",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -132,6 +139,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "dapped" && "Libby, Modern Prestressed Concrete §12-6 — Dapped-End Connections · PCI Design Handbook (5 mode runtuh)"}
           {tab === "bearing" && "Libby, Modern Prestressed Concrete §12-9 — Elastomeric Bearing Pads · AASHTO LRFD §14.7.6 Metode A"}
           {tab === "grade" && "Khan & Williams, Post-tensioned Concrete Floors §11 — Slabs on Grade · Westergaard plat di atas fondasi elastis"}
+          {tab === "box" && "Christian Menn, Prestressed Concrete Bridges (Birkhäuser 1990) Ch.5 — Analysis & Design of Bridge Superstructures · Torsi sel-tunggal (St. Venant/Bredt), distribusi beban, komponen penampang"}
         </div>
 
         {/* Content */}
@@ -145,6 +153,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "dapped"  && <DappedEndCalculator />}
           {tab === "bearing" && <BearingCalculator />}
           {tab === "grade"   && <SlabOnGradeCalculator />}
+          {tab === "box"     && <BoxGirderCalculator />}
         </div>
 
         {/* Footer */}
