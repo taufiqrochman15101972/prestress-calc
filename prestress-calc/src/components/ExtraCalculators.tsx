@@ -13,8 +13,10 @@ import { SlabOnGradeCalculator } from "@/components/SlabOnGradeCalculator";
 import { BoxGirderCalculator } from "@/components/BoxGirderCalculator";
 import { BridgeLoadCalculator } from "@/components/BridgeLoadCalculator";
 import { LateralStabilityCalculator } from "@/components/LateralStabilityCalculator";
+import { SegmentalCalculator } from "@/components/SegmentalCalculator";
+import { ExternalTendonCalculator } from "@/components/ExternalTendonCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext";
 
 interface Props {
   open: boolean;
@@ -94,6 +96,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Stabilitas Lateral / Tekuk Torsi",
     subtitle: "Lateral-torsional buckling balok langsing — W_cr Timoshenko, I_y/J, FS≥3 (Abeles §13.3)",
   },
+  {
+    key: "seg",
+    emoji: "🏗",
+    title: "Konstruksi Bertahap / Segmental",
+    subtitle: "Kantilever seimbang + peluncuran bertahap, redistribusi rangkak (Hewson §13/§15, PTI §2.7)",
+  },
+  {
+    key: "ext",
+    emoji: "🪢",
+    title: "Prategang Eksternal",
+    subtitle: "Tendon poligonal, gaya deviator, efek orde-2, ULS unbonded f_ps (Hewson §6–7, PTI §3.2.3)",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -156,6 +170,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "box" && "Christian Menn, Prestressed Concrete Bridges (Birkhäuser 1990) Ch.5 — Analysis & Design of Bridge Superstructures · Torsi sel-tunggal (St. Venant/Bredt), distribusi beban, komponen penampang"}
           {tab === "load" && "Ir. Soetoyo, Konstruksi Beton Pratekan §9 — Beban 'D' Lajur · SNI 1725:2016 / RSNI T-02-2005 · BTR (q kPa) + BTG (p=49 kN/m) + FBD"}
           {tab === "ltb" && "P.W. Abeles & B.K. Bardhan-Roy, Prestressed Concrete Designer's Handbook 3rd Ed. §13.3 — Stability problems · Timoshenko 'Theory of Elastic Stability' · W_cr=(K/L²)√(B₁C), FS≥3"}
+          {tab === "seg" && "Nigel R. Hewson, Prestressed Concrete Bridges §13/§15 + PTI Post-Tensioning Manual §2.7 — Balanced cantilever, incremental launching, creep redistribution on system change"}
+          {tab === "ext" && "Nigel R. Hewson, Prestressed Concrete Bridges §6–7 + PTI Post-Tensioning Manual §3.2.3 — External post-tensioning · polygonal tendon, deviator forces, 2nd-order eccentricity, ACI unbonded f_ps"}
         </div>
 
         {/* Content */}
@@ -172,6 +188,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "box"     && <BoxGirderCalculator />}
           {tab === "load"    && <BridgeLoadCalculator />}
           {tab === "ltb"     && <LateralStabilityCalculator />}
+          {tab === "seg"     && <SegmentalCalculator />}
+          {tab === "ext"     && <ExternalTendonCalculator />}
         </div>
 
         {/* Footer */}
