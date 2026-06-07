@@ -12,8 +12,9 @@ import { BearingCalculator } from "@/components/BearingCalculator";
 import { SlabOnGradeCalculator } from "@/components/SlabOnGradeCalculator";
 import { BoxGirderCalculator } from "@/components/BoxGirderCalculator";
 import { BridgeLoadCalculator } from "@/components/BridgeLoadCalculator";
+import { LateralStabilityCalculator } from "@/components/LateralStabilityCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb";
 
 interface Props {
   open: boolean;
@@ -87,6 +88,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Beban Jembatan SNI 1725",
     subtitle: "Beban 'D' lajur — BTR + BTG, FBD, M_live/V_live per gelagar (Soetoyo §9 / RSNI T-02)",
   },
+  {
+    key: "ltb",
+    emoji: "🌀",
+    title: "Stabilitas Lateral / Tekuk Torsi",
+    subtitle: "Lateral-torsional buckling balok langsing — W_cr Timoshenko, I_y/J, FS≥3 (Abeles §13.3)",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -148,6 +155,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "grade" && "Khan & Williams, Post-tensioned Concrete Floors §11 — Slabs on Grade · Westergaard plat di atas fondasi elastis"}
           {tab === "box" && "Christian Menn, Prestressed Concrete Bridges (Birkhäuser 1990) Ch.5 — Analysis & Design of Bridge Superstructures · Torsi sel-tunggal (St. Venant/Bredt), distribusi beban, komponen penampang"}
           {tab === "load" && "Ir. Soetoyo, Konstruksi Beton Pratekan §9 — Beban 'D' Lajur · SNI 1725:2016 / RSNI T-02-2005 · BTR (q kPa) + BTG (p=49 kN/m) + FBD"}
+          {tab === "ltb" && "P.W. Abeles & B.K. Bardhan-Roy, Prestressed Concrete Designer's Handbook 3rd Ed. §13.3 — Stability problems · Timoshenko 'Theory of Elastic Stability' · W_cr=(K/L²)√(B₁C), FS≥3"}
         </div>
 
         {/* Content */}
@@ -163,6 +171,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "grade"   && <SlabOnGradeCalculator />}
           {tab === "box"     && <BoxGirderCalculator />}
           {tab === "load"    && <BridgeLoadCalculator />}
+          {tab === "ltb"     && <LateralStabilityCalculator />}
         </div>
 
         {/* Footer */}
