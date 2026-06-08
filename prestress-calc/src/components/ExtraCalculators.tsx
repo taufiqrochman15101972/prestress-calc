@@ -19,8 +19,9 @@ import { HandlingCalculator } from "@/components/HandlingCalculator";
 import { FireResistanceCalculator } from "@/components/FireResistanceCalculator";
 import { DistributionCalculator } from "@/components/DistributionCalculator";
 import { DiffShrinkageCalculator } from "@/components/DiffShrinkageCalculator";
+import { ProfileDatabaseCalculator } from "@/components/ProfileDatabaseCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "handling" | "fire" | "lldf" | "diffsh";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "handling" | "fire" | "lldf" | "diffsh" | "profiles";
 
 interface Props {
   open: boolean;
@@ -136,6 +137,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Susut Diferensial Komposit",
     subtitle: "Deck cor-setempat vs gelagar pracetak — F_sh, M_cs, tegangan soffit (Abeles §11.5/§11.7.4, Evans–Parker)",
   },
+  {
+    key: "profiles",
+    emoji: "📚",
+    title: "Database Profil Girder",
+    subtitle: "Katalog semua penampang (WIKA/AASHTO/PCI/Deck-BT/Double-T/PC-U/voided/box) terurut dimensi + properti A, I, Z, ρ",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -204,6 +211,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "fire" && "PCI Design Handbook 7th Ed. Ch.10 + Abeles & Bardhan-Roy §16 + ACI 216.1 — Fire resistance · min thickness/cover by rating, strand strength retention k_θ, M_n,θ"}
           {tab === "lldf" && "Bridge Superstructure Design Ch.3 — AASHTO LRFD §4.6.2.2 Live-Load Distribution Factors · K_g longitudinal stiffness, interior/exterior, moment/shear, lever rule"}
           {tab === "diffsh" && "P.W. Abeles & B.K. Bardhan-Roy §11.5 / §11.7.4 (Evans & Parker) — Differential shrinkage in composite members · F_sh, M_cs, creep reduction (1−e^−φ)/φ, soffit tension"}
+          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · properti penampang terurut dimensi"}
         </div>
 
         {/* Content */}
@@ -226,6 +234,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "fire"    && <FireResistanceCalculator />}
           {tab === "lldf"    && <DistributionCalculator />}
           {tab === "diffsh"  && <DiffShrinkageCalculator />}
+          {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 
         {/* Footer */}
