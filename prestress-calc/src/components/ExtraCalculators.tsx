@@ -18,8 +18,9 @@ import { ExternalTendonCalculator } from "@/components/ExternalTendonCalculator"
 import { HandlingCalculator } from "@/components/HandlingCalculator";
 import { FireResistanceCalculator } from "@/components/FireResistanceCalculator";
 import { DistributionCalculator } from "@/components/DistributionCalculator";
+import { DiffShrinkageCalculator } from "@/components/DiffShrinkageCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "handling" | "fire" | "lldf";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "handling" | "fire" | "lldf" | "diffsh";
 
 interface Props {
   open: boolean;
@@ -129,6 +130,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Faktor Distribusi LRFD",
     subtitle: "Live-load distribution factor AASHTO LRFD §4.6.2.2 — K_g, interior/eksterior, momen/geser (Bridge Superstructure Ch.3)",
   },
+  {
+    key: "diffsh",
+    emoji: "💧",
+    title: "Susut Diferensial Komposit",
+    subtitle: "Deck cor-setempat vs gelagar pracetak — F_sh, M_cs, tegangan soffit (Abeles §11.5/§11.7.4, Evans–Parker)",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -196,6 +203,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "handling" && "PCI Design Handbook 7th Ed. Ch.8 — Component Handling & Erection Bracing · stripping/transport/erection impact, two-point pickup, long-term camber multipliers"}
           {tab === "fire" && "PCI Design Handbook 7th Ed. Ch.10 + Abeles & Bardhan-Roy §16 + ACI 216.1 — Fire resistance · min thickness/cover by rating, strand strength retention k_θ, M_n,θ"}
           {tab === "lldf" && "Bridge Superstructure Design Ch.3 — AASHTO LRFD §4.6.2.2 Live-Load Distribution Factors · K_g longitudinal stiffness, interior/exterior, moment/shear, lever rule"}
+          {tab === "diffsh" && "P.W. Abeles & B.K. Bardhan-Roy §11.5 / §11.7.4 (Evans & Parker) — Differential shrinkage in composite members · F_sh, M_cs, creep reduction (1−e^−φ)/φ, soffit tension"}
         </div>
 
         {/* Content */}
@@ -217,6 +225,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "handling" && <HandlingCalculator />}
           {tab === "fire"    && <FireResistanceCalculator />}
           {tab === "lldf"    && <DistributionCalculator />}
+          {tab === "diffsh"  && <DiffShrinkageCalculator />}
         </div>
 
         {/* Footer */}
