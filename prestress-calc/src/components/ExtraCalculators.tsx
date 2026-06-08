@@ -15,8 +15,10 @@ import { BridgeLoadCalculator } from "@/components/BridgeLoadCalculator";
 import { LateralStabilityCalculator } from "@/components/LateralStabilityCalculator";
 import { SegmentalCalculator } from "@/components/SegmentalCalculator";
 import { ExternalTendonCalculator } from "@/components/ExternalTendonCalculator";
+import { HandlingCalculator } from "@/components/HandlingCalculator";
+import { FireResistanceCalculator } from "@/components/FireResistanceCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "handling" | "fire";
 
 interface Props {
   open: boolean;
@@ -108,6 +110,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     title: "Prategang Eksternal",
     subtitle: "Tendon poligonal, gaya deviator, efek orde-2, ULS unbonded f_ps (Hewson §6–7, PTI §3.2.3)",
   },
+  {
+    key: "handling",
+    emoji: "🏭",
+    title: "Handling & Ereksi + Camber",
+    subtitle: "Stripping/transport/ereksi, titik angkat, multiplier camber jangka panjang (PCI Ch.8)",
+  },
+  {
+    key: "fire",
+    emoji: "🔥",
+    title: "Ketahanan Api",
+    subtitle: "Tebal & cover min per rating, k_θ retensi strand, M_n,θ ≥ M_fire (PCI Ch.10 / Abeles §16 / ACI 216)",
+  },
 ];
 
 export function ExtraCalculators({ open, onClose }: Props) {
@@ -172,6 +186,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "ltb" && "P.W. Abeles & B.K. Bardhan-Roy, Prestressed Concrete Designer's Handbook 3rd Ed. §13.3 — Stability problems · Timoshenko 'Theory of Elastic Stability' · W_cr=(K/L²)√(B₁C), FS≥3"}
           {tab === "seg" && "Nigel R. Hewson, Prestressed Concrete Bridges §13/§15 + PTI Post-Tensioning Manual §2.7 — Balanced cantilever, incremental launching, creep redistribution on system change"}
           {tab === "ext" && "Nigel R. Hewson, Prestressed Concrete Bridges §6–7 + PTI Post-Tensioning Manual §3.2.3 — External post-tensioning · polygonal tendon, deviator forces, 2nd-order eccentricity, ACI unbonded f_ps"}
+          {tab === "handling" && "PCI Design Handbook 7th Ed. Ch.8 — Component Handling & Erection Bracing · stripping/transport/erection impact, two-point pickup, long-term camber multipliers"}
+          {tab === "fire" && "PCI Design Handbook 7th Ed. Ch.10 + Abeles & Bardhan-Roy §16 + ACI 216.1 — Fire resistance · min thickness/cover by rating, strand strength retention k_θ, M_n,θ"}
         </div>
 
         {/* Content */}
@@ -190,6 +206,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "ltb"     && <LateralStabilityCalculator />}
           {tab === "seg"     && <SegmentalCalculator />}
           {tab === "ext"     && <ExternalTendonCalculator />}
+          {tab === "handling" && <HandlingCalculator />}
+          {tab === "fire"    && <FireResistanceCalculator />}
         </div>
 
         {/* Footer */}
