@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { computeHandling } from "@/engine/handling";
 import type { HandlingInputs } from "@/engine/handling";
+import { checkDebondLimits } from "@/engine/development";
 
 const DEFAULT: HandlingInputs = {
   L: 30, w: 13.4, A: 5.35e5, Ztop: 2.016e8, Zbot: 2.305e8, fci: 35,
@@ -149,6 +150,45 @@ export function HandlingCalculator() {
 
         <Chk label="Tegangan handling dalam batas (semua tahap)"
           value={`σ ∈ [${f(res.limComp, 1)}, ${f(res.limTens, 1)}] MPa`} ok={res.handlingOk} />
+
+        <DebondBlock />
+      </div>
+    </div>
+  );
+}
+
+// ── Debonding (shielding) strand di ujung — batas AASHTO §5.9.4.3.3 ──
+// Alternatif pengangkatan/harping untuk menurunkan tegangan transfer di
+// ujung: sebagian strand dibungkus (bond-break). Batas: ≤25% dari total
+// dan ≤40% per baris (pola "middle break" pada design-flow FDOT LRFD).
+function DebondBlock() {
+  const [nTotal, setNTotal] = useState(36);
+  const [nDeb, setNDeb] = useState(8);
+  const [nRow, setNRow] = useState(12);
+  const [nDebRow, setNDebRow] = useState(4);
+  const r = useMemo(() => checkDebondLimits(nDeb, nTotal, nDebRow, nRow),
+    [nDeb, nTotal, nDebRow, nRow]);
+
+  return (
+    <div className="border-t border-gray-200 pt-2">
+      <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">
+        Debonding / Shielding Strand Ujung (AASHTO §5.9.4.3.3 — alternatif harping)
+      </p>
+      <div className="flex gap-3 items-start">
+        <div className="w-44 flex-none grid grid-cols-2 gap-1.5">
+          <Nf label="Strand total" value={nTotal} onChange={setNTotal} step={2} />
+          <Nf label="Debonded total" value={nDeb} onChange={setNDeb} step={2} />
+          <Nf label="Strand baris kritis" value={nRow} onChange={setNRow} step={2} />
+          <Nf label="Debonded di baris" value={nDebRow} onChange={setNDebRow} step={2} />
+        </div>
+        <div className="flex-1">
+          <Chk label="Debonded ≤ 25% total" value={`${r.pctTotal.toFixed(1)}%`} ok={r.totalOk} />
+          <Chk label="Debonded ≤ 40% per baris" value={`${r.pctRow.toFixed(1)}%`} ok={r.rowOk} />
+          <p className="text-[9px] text-gray-400 mt-1 leading-snug">
+            Putus-rekat simetris terhadap sumbu, diakhiri bertahap (staggered), tidak boleh
+            sampai daerah tengah bentang; ℓ_t dihitung dari titik akhir shielding.
+          </p>
+        </div>
       </div>
     </div>
   );

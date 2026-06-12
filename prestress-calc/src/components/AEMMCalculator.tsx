@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { computeAEMM, computeJointMovement } from "@/engine/aemm";
 import type { AEMMInputs } from "@/engine/aemm";
+import { computePTApproxLoss } from "@/engine/losses";
 
 // Benchmark girder defaults (A_g, I_g from the verified PRD section)
 const DEFAULT: AEMMInputs = {
@@ -138,7 +139,57 @@ export function AEMMCalculator() {
 
         <JointMovementBlock Pe={inp.Pe} A={inp.A} Ec={inp.Ec}
           phi={inp.phi} epsShMicro={inp.epsShMicro} />
+
+        <PTApproxLossBlock A={inp.A} Aps={inp.Aps} />
       </div>
+    </div>
+  );
+}
+
+// ── Kehilangan jangka panjang PASCA-TARIK — metode aproksimasi ────
+// Shing & Kottari (UCSD SSRP-11/02, Caltrans): AASHTO approximate
+// yang diperluas untuk POST-TENSIONED — umur beton saat stressing t_i
+// dan restraint tulangan lunak ρ_ns ikut diperhitungkan.
+function PTApproxLossBlock({ A, Aps }: { A: number; Aps: number }) {
+  const [fpi, setFpi] = useState(1395);
+  const [fc, setFc] = useState(35);
+  const [ti, setTi] = useState(30);
+  const [RH, setRH] = useState(70);
+  const [rhoNsPct, setRhoNsPct] = useState(0.7);
+  const r = useMemo(
+    () => computePTApproxLoss({ fpi, Aps, At: A, fc, ti, RH, rhoNs: rhoNsPct / 100 }),
+    [fpi, Aps, A, fc, ti, RH, rhoNsPct]);
+  const f = (v: number, d = 1) => v.toFixed(d);
+
+  return (
+    <div className="border-t border-gray-200 pt-2">
+      <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">
+        Kehilangan Jangka Panjang Pasca-Tarik — Aproksimasi PT (Shing–Kottari / Caltrans SSRP-11/02 eq. 6.7)
+      </p>
+      <div className="flex gap-3">
+        <div className="w-40 flex-none grid grid-cols-1 gap-1.5">
+          <Nf label="f_pi setelah angkur" unit="MPa" value={fpi} onChange={setFpi} step={25} />
+          <Nf label="f'c 28-hari" unit="MPa" value={fc} onChange={setFc} step={5} />
+          <Nf label="t_i umur saat PT" unit="hari" value={ti} onChange={setTi} step={5} />
+          <Nf label="RH kelembaban" unit="%" value={RH} onChange={setRH} step={5} />
+          <Nf label="ρ_ns tulangan lunak" unit="%" value={rhoNsPct} onChange={setRhoNsPct} step={0.1} />
+        </div>
+        <table className="flex-1"><tbody>
+          <Row label="γ_st = 1/(0.67+f'c/62)" value={f(r.gamma_st, 3)} />
+          <Row label={`γ_ac = t_i^−0.118 · γ_as susut tersisa`} value={`${f(r.gamma_ac, 3)} / ${f(r.gamma_as, 3)}`} />
+          <Row label="γ_h = 1.7−0.01H" value={f(r.gamma_h, 3)} />
+          <Row label={`γ_sr restraint baja (η̄=${f(r.etaBar, 1)}, ρ_ps=${f(r.rhoPs * 100, 2)}%)`} value={f(r.gamma_sr, 3)} hi />
+          <Row label="Δf_p creep+susut ·γ_h·γ_sr" value={f(r.deltaFp_creepShrink)} unit="MPa" />
+          <Row label="Δf_pR relaksasi" value={f(r.deltaFp_relax)} unit="MPa" />
+          <Row label="Δf_pLT TOTAL" value={f(r.deltaFpLT)} unit="MPa" hi />
+          <Row label="terhadap f_pi" value={f(r.lossPct, 2)} unit="%" hi />
+        </tbody></table>
+      </div>
+      <p className="text-[9px] text-gray-400 mt-1 leading-snug">
+        Berbeda dari aproksimasi AASHTO pratarik: makin tua beton saat di-stressing (t_i besar)
+        → creep & susut tersisa makin kecil; tulangan lunak banyak (box girder CIP) → γ_sr &lt; 1
+        menahan creep/susut. Bandingkan dengan loss AEMM di atas — keduanya cross-check.
+      </p>
     </div>
   );
 }

@@ -65,3 +65,32 @@ export function computeTransferLength(
     db:    db_mm,
   });
 }
+
+// ─── Debonded (Shielded) Strand Limits ───────────────────────
+// AASHTO LRFD §5.9.4.3.3 — partially debonding (bond-breaking)
+// strands at member ends lowers the transfer-stage end stresses
+// in lieu of harping (the FDOT LRFD design-flow "middle break"
+// strand patterns). Limits: debonded strands ≤ 25 % of the total,
+// and ≤ 40 % of the strands in any horizontal row; debonding must
+// terminate symmetrically and outside the span middle.
+
+export interface DebondCheckResult {
+  readonly pctTotal: number;    // debonded / total (%)
+  readonly pctRow: number;      // debonded-in-row / row (%)
+  readonly totalOk: boolean;    // ≤ 25 %
+  readonly rowOk: boolean;      // ≤ 40 %
+  readonly ok: boolean;
+}
+
+export function checkDebondLimits(
+  nDebonded: number,     // total debonded strands
+  nTotal: number,        // total strands in section
+  nDebondedRow: number,  // debonded strands in the worst row
+  nRow: number           // strands in that row
+): DebondCheckResult {
+  const pctTotal = nTotal > 0 ? (nDebonded / nTotal) * 100 : 0;
+  const pctRow = nRow > 0 ? (nDebondedRow / nRow) * 100 : 0;
+  const totalOk = pctTotal <= 25;
+  const rowOk = pctRow <= 40;
+  return Object.freeze({ pctTotal, pctRow, totalOk, rowOk, ok: totalOk && rowOk });
+}

@@ -26,8 +26,9 @@ import { CurvedTendonCalculator } from "@/components/CurvedTendonCalculator";
 import { RatingCalculator } from "@/components/RatingCalculator";
 import { SplicedGirderCalculator } from "@/components/SplicedGirderCalculator";
 import { FatigueCalculator } from "@/components/FatigueCalculator";
+import { OptimizationCalculator } from "@/components/OptimizationCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "profiles";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles";
 
 interface Props {
   open: boolean;
@@ -180,10 +181,16 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "RF inventory/operating — lentur, geser, Service III; beban aman & posting (AASHTO MBE §6A / CDOT 9B)",
   },
   {
+    key: "opt",
+    emoji: "💰",
+    title: "Optimasi Biaya HPC",
+    subtitle: "Biaya per m² dek — CMCR = 0.936+(f'c/100)³, jumlah vs jarak gelagar, angkut+ereksi (Hassanain–Loov PCI J. 1999)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
-    subtitle: "Katalog semua penampang (WIKA/AASHTO/PCI/Deck-BT/Double-T/PC-U/voided/box) terurut dimensi + properti A, I, Z, ρ + strand & tendon PT",
+    subtitle: "Katalog semua penampang (WIKA/AASHTO/PCI/NU/CPCI/Deck-BT/Double-T/PC-U/voided/box) terurut dimensi + properti A, I, Z, ρ + strand & tendon PT",
   },
 ];
 
@@ -259,7 +266,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "diffsh" && "P.W. Abeles & B.K. Bardhan-Roy §11.5 / §11.7.4 (Evans & Parker) — Differential shrinkage in composite members · F_sh, M_cs, creep reduction (1−e^−φ)/φ, soffit tension"}
           {tab === "aemm" && "Gilbert, Mickleborough & Ranzi 'Design of Prestressed Concrete to Eurocode 2' §5.7 / §5.11.4 — Age-Adjusted Effective Modulus Method (Trost–Bažant), restraint creep+susut+relaksasi, penampang transformasi age-adjusted"}
           {tab === "special" && "N. Krishna Raju 'Prestressed Concrete' Bab 16 & 19 — pipa prategang melingkar (wire winding), tiang/pole prategang, bantalan rel (rail-seat & centre moment)"}
-          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · properti penampang terurut dimensi"}
+          {tab === "opt" && "Hassanain & Loov, 'Design of Prestressed Girder Bridges Using HPC — An Optimization Approach' (PCI Journal 1999) — C = [n_g·C_g + C_c·V_c + C_s·m_s]/(W·L), CMCR mix-cost ratio, jarak gelagar 3–6 m, n_g ≥ 2"}
+          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · properti penampang terurut dimensi"}
         </div>
 
         {/* Content */}
@@ -288,6 +296,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "diffsh"  && <DiffShrinkageCalculator />}
           {tab === "aemm"    && <AEMMCalculator />}
           {tab === "special" && <SpecialMembersCalculator />}
+          {tab === "opt"     && <OptimizationCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

@@ -240,3 +240,72 @@ export function computeLumpSumLosses(
     deltaFpLT: deltaFp_creepShrink + deltaFp_relax,
   });
 }
+
+// ─── Post-Tensioned Approximate Long-Term Loss ───────────────
+// Shing & Kottari, UCSD SSRP-11/02 (Caltrans, 2011) eq. (6.7) —
+// the AASHTO approximate method extended for POST-TENSIONED
+// girders: it accounts for the age of concrete at stressing t_i
+// (creep already partly developed, shrinkage partly occurred)
+// and the restraint by mild reinforcement ρ_ns, both ignored by
+// the pretensioned AASHTO approximate formula above.
+//
+//   Δf_pLT = (14·γ_st·γ_ac·f_pi·A_ps/A_t + 69·γ_as)·γ_h·γ_sr + Δf_pR
+//   γ_st = 1/(0.67 + f'c/62)               (strength, f'c in MPa)
+//   γ_ac(t_i) = t_i^−0.118                  (creep maturity at stressing)
+//   γ_as(t_i) = 1 − [t_i/(35+t_i)]·[(45+t_i)/(157+t_i)]   (remaining shrinkage)
+//   γ_h  = 1.7 − 0.01·H                     (relative humidity)
+//   γ_sr = 1/(1 + (η̄_s−1)(ρ_ps+ρ_ns)),  η̄_s = 6(1 + 1.2·t_i^−0.118)
+//   Δf_pR = 16.5 MPa (low-relax) / 69 MPa (stress-relieved)
+// (US-unit original: 14·…·f_pi·A_ps/A_t + 10 ksi; γ_st = 1/(0.67+f'c/9 ksi).)
+
+export interface PTApproxLossInputs {
+  fpi: number;     // strand stress just after anchoring (MPa)
+  Aps: number;     // total prestressing steel area (mm²)
+  At: number;      // net/gross cross-section area of the girder (mm²)
+  fc: number;      // 28-day concrete strength (MPa)
+  ti: number;      // age of concrete at post-tensioning (days)
+  RH: number;      // relative humidity (%)
+  rhoNs: number;   // mild-steel ratio A_s/A_t (e.g. 0.007 for CIP box webs)
+  lowRelax?: boolean; // default true
+}
+
+export interface PTApproxLossResult {
+  readonly gamma_st: number;
+  readonly gamma_ac: number;
+  readonly gamma_as: number;
+  readonly gamma_h: number;
+  readonly etaBar: number;          // η̄_s age-adjusted modular ratio
+  readonly rhoPs: number;           // A_ps/A_t
+  readonly gamma_sr: number;        // steel-restraint factor
+  readonly deltaFp_creep: number;   // creep part before γh·γsr (MPa)
+  readonly deltaFp_shrink: number;  // shrinkage part before γh·γsr (MPa)
+  readonly deltaFp_creepShrink: number; // (creep+shrink)·γh·γsr (MPa)
+  readonly deltaFp_relax: number;   // Δf_pR (MPa)
+  readonly deltaFpLT: number;       // total long-term loss (MPa)
+  readonly lossPct: number;         // Δf_pLT / f_pi × 100 (%)
+}
+
+export function computePTApproxLoss(inp: PTApproxLossInputs): PTApproxLossResult {
+  const { fpi, Aps, At, fc, ti, RH, rhoNs } = inp;
+  const lowRelax = inp.lowRelax !== false;
+
+  const gamma_st = 1 / (0.67 + fc / 62.0);          // 9 ksi = 62.05 MPa
+  const gamma_ac = Math.pow(Math.max(ti, 1), -0.118);
+  const gamma_as = 1 - (ti / (35 + ti)) * ((45 + ti) / (157 + ti));
+  const gamma_h = 1.7 - 0.01 * RH;
+  const etaBar = 6 * (1 + 1.2 * gamma_ac);
+  const rhoPs = Aps / At;
+  const gamma_sr = 1 / (1 + (etaBar - 1) * (rhoPs + rhoNs));
+
+  const deltaFp_creep = 14 * gamma_st * gamma_ac * ((fpi * Aps) / At);
+  const deltaFp_shrink = 68.9 * gamma_as;            // 10 ksi = 68.95 MPa
+  const deltaFp_creepShrink = (deltaFp_creep + deltaFp_shrink) * gamma_h * gamma_sr;
+  const deltaFp_relax = lowRelax ? 16.5 : 69;        // 2.4 / 10 ksi
+  const deltaFpLT = deltaFp_creepShrink + deltaFp_relax;
+
+  return Object.freeze({
+    gamma_st, gamma_ac, gamma_as, gamma_h, etaBar, rhoPs, gamma_sr,
+    deltaFp_creep, deltaFp_shrink, deltaFp_creepShrink, deltaFp_relax,
+    deltaFpLT, lossPct: (deltaFpLT / fpi) * 100,
+  });
+}

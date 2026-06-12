@@ -12,6 +12,7 @@ import type { IGirderGeometry } from "@/types";
 
 export type PresetCategory =
   | "CUSTOM" | "WIKA_WF" | "AASHTO_I" | "PCI_BT" | "PCI_I"
+  | "NU" | "CPCI"
   | "DECK_BULB_T" | "DOUBLE_T" | "PC_U" | "VOIDED_SLAB" | "BOX";
 
 export interface GirderPreset {
@@ -28,6 +29,8 @@ export const CATEGORY_LABEL: Record<PresetCategory, string> = {
   AASHTO_I: "AASHTO Type I–VI",
   PCI_BT: "PCI Bulb-Tee",
   PCI_I: "PCI / Standard I",
+  NU: "NU I-Girder (Nebraska, metrik)",
+  CPCI: "CPCI I-Girder (Kanada, metrik)",
   DECK_BULB_T: "Deck Bulb-Tee",
   DOUBLE_T: "Double-Tee",
   PC_U: "PC-U Girder (trough)",
@@ -86,6 +89,47 @@ export const GIRDER_PRESETS: GirderPreset[] = [
     girder: { b1: 450, h1: 90, h5: 50, b2: 150, h2: 320, h4: 50, b3: 500, h3: 90 } },
   { id: "pci_36x16", name: "PCI Std I 900", category: "PCI_I", spanRange: "18–27 m",
     girder: { b1: 500, h1: 110, h5: 70, b2: 160, h2: 540, h4: 70, b3: 600, h3: 110 } },
+
+  // ── NU I-Girder series (Geren & Tadros, PCI Journal 1994) ──
+  // "Hard"-metric Nebraska girders: thin 150 web, wide 1225×65 top
+  // flange + 975×140 bottom flange, R=200 circular fillets. The
+  // circular fillets are idealised here as area-equivalent trapezoids
+  // (h5=94, h4=242 calibrated so NU2000 matches the true ≈635,600 mm²);
+  // flange dims are identical for the whole series — only h2 varies.
+  { id: "nu_750", name: "NU 750", category: "NU", spanRange: "15–24 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 209, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_900", name: "NU 900", category: "NU", spanRange: "18–28 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 359, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_1100", name: "NU 1100", category: "NU", spanRange: "22–33 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 559, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_1350", name: "NU 1350", category: "NU", spanRange: "27–39 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 809, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_1600", name: "NU 1600", category: "NU", spanRange: "32–44 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 1059, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_1800", name: "NU 1800", category: "NU", spanRange: "36–48 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 1259, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_2000", name: "NU 2000", category: "NU", spanRange: "38–52 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 1459, h4: 242, b3: 975, h3: 140 } },
+  { id: "nu_2400", name: "NU 2400", category: "NU", spanRange: "45–60 m",
+    girder: { b1: 1225, h1: 65, h5: 94, b2: 150, h2: 1859, h4: 242, b3: 975, h3: 140 } },
+  // post-tensioned variant: 175 web for 12×15.2 mm strand ducts
+  { id: "nu_2000pt", name: "NU 2000PT (multi-tendon)", category: "NU", spanRange: "38–52 m",
+    girder: { b1: 1250, h1: 65, h5: 94, b2: 175, h2: 1459, h4: 242, b3: 1000, h3: 140 } },
+
+  // ── CPCI metric I-girders (Hassanain & Loov, PCI J. 1999) ──
+  // Canadian Precast/Prestressed Concrete Institute standard types;
+  // 150 web throughout — areas check against the published table
+  // (320/414/499/544/604 ×10³ mm²) within the trapezoid idealisation.
+  { id: "cpci_1200", name: "CPCI 1200", category: "CPCI", spanRange: "20–30 m",
+    girder: { b1: 400, h1: 150, h5: 50, b2: 150, h2: 700, h4: 120, b3: 550, h3: 180 } },
+  { id: "cpci_1400", name: "CPCI 1400", category: "CPCI", spanRange: "25–35 m",
+    girder: { b1: 550, h1: 150, h5: 80, b2: 150, h2: 840, h4: 150, b3: 650, h3: 180 } },
+  { id: "cpci_1600", name: "CPCI 1600", category: "CPCI", spanRange: "30–40 m",
+    girder: { b1: 900, h1: 125, h5: 125, b2: 150, h2: 1000, h4: 150, b3: 650, h3: 200 } },
+  { id: "cpci_1900", name: "CPCI 1900", category: "CPCI", spanRange: "35–48 m",
+    girder: { b1: 900, h1: 125, h5: 125, b2: 150, h2: 1300, h4: 150, b3: 650, h3: 200 } },
+  { id: "cpci_2300", name: "CPCI 2300", category: "CPCI", spanRange: "40–55 m",
+    girder: { b1: 900, h1: 125, h5: 125, b2: 150, h2: 1700, h4: 150, b3: 650, h3: 200 } },
 
   // ── Deck Bulb-Tee (wide top flange acts as the deck) ──────
   { id: "dbt_1200", name: "Deck Bulb-Tee 1200", category: "DECK_BULB_T", spanRange: "20–30 m",
