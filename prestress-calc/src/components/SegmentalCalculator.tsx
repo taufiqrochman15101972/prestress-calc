@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computeSegmental } from "@/engine/segmental";
-import type { SegmentalInputs, ErectionMethod } from "@/engine/segmental";
+import { computeSegmental, computePrelimPT } from "@/engine/segmental";
+import type { SegmentalInputs, ErectionMethod, PrelimPTInputs } from "@/engine/segmental";
 
 const DEFAULT: SegmentalInputs = {
   // Deep balanced-cantilever pier-segment box (≈6 m deep): properties coupled to span
@@ -191,6 +191,63 @@ export function SegmentalCalculator() {
 
         <Chk label="Tegangan serat dalam batas (ereksi)"
           value={`σ ∈ [${f(res.limComp, 1)}, ${f(res.limTens, 1)}]`} ok={res.stressOk} />
+
+        <PrelimPTBlock />
+      </div>
+    </div>
+  );
+}
+
+// ── Preliminary PT-layout estimator (Montgomery / ASPIRE) ─────────
+const DEFAULT_PT: PrelimPTInputs = {
+  A: 1.2e7, I: 3.0e13, c: 2800, e: 2400, eta: 0.75, Pstrand: 160,
+  M_DC: 180000, M_DW: 25000, M_CR: 12000, M_SH: 3000, M_LL: 60000, M_TG: 18000,
+  fc: 45, strandsPerTendon: 19,
+};
+
+function PrelimPTBlock() {
+  const [inp, setInp] = useState<PrelimPTInputs>(DEFAULT_PT);
+  const set = (k: keyof PrelimPTInputs, v: number) =>
+    setInp(prev => ({ ...prev, [k]: v }));
+  const r = useMemo(() => computePrelimPT(inp), [inp]);
+  const f = (v: number, d = 2) => v.toFixed(d);
+
+  return (
+    <div className="border-t border-gray-200 pt-2 mt-2">
+      <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">
+        Estimasi Awal Jumlah Strand PT — Efisiensi Tendon (Montgomery, ASPIRE)
+      </p>
+      <div className="flex gap-3">
+        <div className="w-60 flex-none grid grid-cols-2 gap-1.5">
+          <Nf label="A penampang" unit="mm²" value={inp.A} onChange={v => set("A", v)} step={1e5} />
+          <Nf label="I" unit="mm⁴" value={inp.I} onChange={v => set("I", v)} step={1e12} />
+          <Nf label="c serat tarik" unit="mm" value={inp.c} onChange={v => set("c", v)} step={50} />
+          <Nf label="e tendon" unit="mm" value={inp.e} onChange={v => set("e", v)} step={50} />
+          <Nf label="η efisiensi (1−M₂/M₁)" value={inp.eta} onChange={v => set("eta", v)} step={0.05} />
+          <Nf label="P₁ per strand" unit="kN" value={inp.Pstrand} onChange={v => set("Pstrand", v)} step={5} />
+          <Nf label="M_DC" unit="kN·m" value={inp.M_DC} onChange={v => set("M_DC", v)} step={1000} />
+          <Nf label="M_DW" unit="kN·m" value={inp.M_DW} onChange={v => set("M_DW", v)} step={500} />
+          <Nf label="M_CR redistribusi" unit="kN·m" value={inp.M_CR} onChange={v => set("M_CR", v)} step={500} />
+          <Nf label="M_SH susut" unit="kN·m" value={inp.M_SH} onChange={v => set("M_SH", v)} step={500} />
+          <Nf label="M_LL+IM" unit="kN·m" value={inp.M_LL} onChange={v => set("M_LL", v)} step={1000} />
+          <Nf label="M_TG gradien T" unit="kN·m" value={inp.M_TG} onChange={v => set("M_TG", v)} step={500} />
+          <Nf label="f'c layan" unit="MPa" value={inp.fc} onChange={v => set("fc", v)} />
+          <Nf label="strand per tendon" value={inp.strandsPerTendon} onChange={v => set("strandsPerTendon", v)} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <table className="w-full"><tbody>
+            <Row label="M_design = ΣM + 0.8·M_LL + 0.5·M_TG (Service III)" value={f(r.Mdesign, 0)} unit="kN·m" hi />
+            <Row label="σ_design = M·c/I (+tarik)" value={f(r.sigmaDesign, 2)} unit="MPa" />
+            <Row label="σ_limit = 0.5√f'c" value={f(r.sigmaLimit, 2)} unit="MPa" />
+            <Row label="σ_PT,1 = P₁/A + η·P₁·e·c/I (1 strand)" value={f(r.sigmaPT1, 3)} unit="MPa" hi />
+            <Row label="n strand perlu" value={`${r.nStrands}`} hi />
+            <Row label={`jumlah tendon @ ${inp.strandsPerTendon} strand`} value={`${r.nTendons}`} hi />
+            <Row label="ΣP efektif layout" value={f(r.Ptotal, 0)} unit="kN" />
+            <Row label="σ serat dengan layout" value={f(r.sigmaFinal, 2)} unit="MPa" />
+          </tbody></table>
+          <Chk label="σ_final ≤ σ_limit (tarik Service III)"
+            value={`${f(r.sigmaFinal, 2)} ≤ ${f(r.sigmaLimit, 2)} MPa`} ok={r.ok} />
+        </div>
       </div>
     </div>
   );

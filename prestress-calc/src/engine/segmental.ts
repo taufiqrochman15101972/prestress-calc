@@ -103,6 +103,94 @@ export interface SegmentalResult {
   readonly Mfinal: number;      // redistributed dead-load moment (kN·m)
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Preliminary PT-layout estimator (Montgomery, ASPIRE "Concrete
+// Segmental Bridges — Preliminary Determination of Post-Tensioning
+// Layouts"): pick the strand count from the governing SLS tension at
+// the critical section, using the TENDON-EFFICIENCY concept
+// η = 1 − M_secondary/M_primary (η = 1 for statically determinate).
+//
+//   σ_Design = (M_DC+M_DW+M_CR+M_SH + 0.8·M_LL + 0.5·M_TG)·c/I   (+ tension)
+//   σ_PT,1   = P₁/A + η·P₁·e·c/I                                 (one strand)
+//   n        = (σ_Design − σ_LIMIT) / σ_PT,1   →  round up
+//
+// σ_LIMIT per the adopted code (0.5·√f'c Service III tension). Only the
+// procedure comes from the article — never its worked numbers.
+// ─────────────────────────────────────────────────────────────────
+
+export interface PrelimPTInputs {
+  /** Cross-section area at the critical section A (mm²) */
+  A: number;
+  /** Moment of inertia I (mm⁴) */
+  I: number;
+  /** Distance NA → governing tension fibre c (mm) */
+  c: number;
+  /** Tendon eccentricity from NA at the section e (mm, same side as c) */
+  e: number;
+  /** Tendon efficiency η = 1 − M₂/M₁ (1.0 = no secondary moment) */
+  eta: number;
+  /** Effective force of ONE strand after all losses P₁ (kN) */
+  Pstrand: number;
+  /** Moments at the section (kN·m): DC, DW, creep-redistribution, shrinkage, LL+IM, temp-gradient */
+  M_DC: number;
+  M_DW: number;
+  M_CR: number;
+  M_SH: number;
+  M_LL: number;
+  M_TG: number;
+  /** f'c at service (MPa) */
+  fc: number;
+  /** Strands per tendon for the unit suggestion */
+  strandsPerTendon: number;
+}
+
+export interface PrelimPTResult {
+  /** Governing design moment Service III (kN·m) */
+  readonly Mdesign: number;
+  /** Design fibre stress σ_Design (MPa, + tension) */
+  readonly sigmaDesign: number;
+  /** Tension limit σ_LIMIT (MPa) */
+  readonly sigmaLimit: number;
+  /** Compression delivered by ONE strand at the fibre (MPa, >0) */
+  readonly sigmaPT1: number;
+  /** Required strand count (rounded up) */
+  readonly nStrands: number;
+  /** Suggested number of tendons at strandsPerTendon each */
+  readonly nTendons: number;
+  /** Total effective PT force of the suggested layout (kN) */
+  readonly Ptotal: number;
+  /** Resulting fibre stress with the suggested layout (MPa) */
+  readonly sigmaFinal: number;
+  readonly ok: boolean;
+}
+
+export function computePrelimPT(inp: PrelimPTInputs): PrelimPTResult {
+  const { A, I, c, e, eta, Pstrand, M_DC, M_DW, M_CR, M_SH, M_LL, M_TG, fc, strandsPerTendon } = inp;
+
+  // Service III combination (segmental: 0.8·LL, 0.5·TG)
+  const Mdesign = M_DC + M_DW + M_CR + M_SH + 0.8 * M_LL + 0.5 * M_TG; // kN·m
+  const sigmaDesign = (Mdesign * 1e6 * c) / I;                          // MPa (+ tension)
+  const sigmaLimit = 0.5 * Math.sqrt(fc);                               // MPa
+
+  // One-strand compression at the governing fibre (axial + η × primary moment)
+  const P1 = Pstrand * 1000; // N
+  const sigmaPT1 = P1 / A + (eta * P1 * e * c) / I; // MPa, compression magnitude
+
+  const nReq = sigmaPT1 > 0 ? (sigmaDesign - sigmaLimit) / sigmaPT1 : 0;
+  const nStrands = Math.max(0, Math.ceil(nReq));
+  const nTendons = strandsPerTendon > 0 ? Math.ceil(nStrands / strandsPerTendon) : 0;
+  const nProvided = nTendons * strandsPerTendon;
+
+  const Ptotal = (nProvided * P1) / 1000; // kN
+  const sigmaFinal = sigmaDesign - nProvided * sigmaPT1; // MPa at the fibre
+  const ok = sigmaFinal <= sigmaLimit;
+
+  return Object.freeze({
+    Mdesign, sigmaDesign, sigmaLimit, sigmaPT1,
+    nStrands, nTendons, Ptotal, sigmaFinal, ok,
+  });
+}
+
 export function computeSegmental(inp: SegmentalInputs): SegmentalResult {
   const {
     method, A, Ztop, Zbot, fci, w,

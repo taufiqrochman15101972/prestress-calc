@@ -20,8 +20,12 @@ import { FireResistanceCalculator } from "@/components/FireResistanceCalculator"
 import { DistributionCalculator } from "@/components/DistributionCalculator";
 import { DiffShrinkageCalculator } from "@/components/DiffShrinkageCalculator";
 import { ProfileDatabaseCalculator } from "@/components/ProfileDatabaseCalculator";
+import { AEMMCalculator } from "@/components/AEMMCalculator";
+import { SpecialMembersCalculator } from "@/components/SpecialMembersCalculator";
+import { CurvedTendonCalculator } from "@/components/CurvedTendonCalculator";
+import { RatingCalculator } from "@/components/RatingCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "handling" | "fire" | "lldf" | "diffsh" | "profiles";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "curved" | "handling" | "fire" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "profiles";
 
 interface Props {
   open: boolean;
@@ -105,13 +109,19 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     key: "seg",
     emoji: "🏗",
     title: "Konstruksi Bertahap / Segmental",
-    subtitle: "Kantilever seimbang + peluncuran bertahap, redistribusi rangkak (Hewson §13/§15, PTI §2.7)",
+    subtitle: "Kantilever seimbang + peluncuran bertahap, redistribusi rangkak + estimasi awal layout PT (Hewson §13/§15, PTI §2.7, ASPIRE)",
   },
   {
     key: "ext",
     emoji: "🪢",
     title: "Prategang Eksternal",
     subtitle: "Tendon poligonal, gaya deviator, efek orde-2, ULS unbonded f_ps (Hewson §6–7, PTI §3.2.3)",
+  },
+  {
+    key: "curved",
+    emoji: "➰",
+    title: "Tendon Melengkung — Gaya Radial",
+    subtitle: "F = P_u/R sebidang + multistrand flattening, geser cover, tieback (Stone–Breen CTR 208-3F, AASHTO §5.9.5.4.3)",
   },
   {
     key: "handling",
@@ -138,10 +148,28 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Deck cor-setempat vs gelagar pracetak — F_sh, M_cs, tegangan soffit (Abeles §11.5/§11.7.4, Evans–Parker)",
   },
   {
+    key: "aemm",
+    emoji: "⏳",
+    title: "Jangka Panjang AEMM",
+    subtitle: "Age-adjusted effective modulus (Trost–Bažant) — Ē=E/(1+χφ), Δε/Δκ, lendutan & loss jangka panjang + pergerakan expansion joint (Gilbert §5.7/§5.11)",
+  },
+  {
+    key: "special",
+    emoji: "🧪",
+    title: "Pipa · Tiang · Bantalan Rel",
+    subtitle: "Elemen prategang khusus — pipa melingkar (hoop), pole kantilever angin, sleeper rel (Krishna Raju Bab 16 & 19)",
+  },
+  {
+    key: "rating",
+    emoji: "🏷",
+    title: "Load Rating Jembatan (LRFR)",
+    subtitle: "RF inventory/operating — lentur, geser, Service III; beban aman & posting (AASHTO MBE §6A / CDOT 9B)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
-    subtitle: "Katalog semua penampang (WIKA/AASHTO/PCI/Deck-BT/Double-T/PC-U/voided/box) terurut dimensi + properti A, I, Z, ρ",
+    subtitle: "Katalog semua penampang (WIKA/AASHTO/PCI/Deck-BT/Double-T/PC-U/voided/box) terurut dimensi + properti A, I, Z, ρ + strand & tendon PT",
   },
 ];
 
@@ -207,10 +235,14 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "ltb" && "P.W. Abeles & B.K. Bardhan-Roy, Prestressed Concrete Designer's Handbook 3rd Ed. §13.3 — Stability problems · Timoshenko 'Theory of Elastic Stability' · W_cr=(K/L²)√(B₁C), FS≥3"}
           {tab === "seg" && "Nigel R. Hewson, Prestressed Concrete Bridges §13/§15 + PTI Post-Tensioning Manual §2.7 — Balanced cantilever, incremental launching, creep redistribution on system change"}
           {tab === "ext" && "Nigel R. Hewson, Prestressed Concrete Bridges §6–7 + PTI Post-Tensioning Manual §3.2.3 — External post-tensioning · polygonal tendon, deviator forces, 2nd-order eccentricity, ACI unbonded f_ps"}
+          {tab === "curved" && "Stone & Breen, CTR 208-3F 'Design of Post-Tensioned Girder Anchorage Zones' + Powell/Breen/Kreger CTR 365-1 (deviator & radius duct) — gaya radial tendon melengkung F=P_u/R, multistrand side-face, geser cover d_eff, tieback (AASHTO LRFD §5.9.5.4.3)"}
+          {tab === "rating" && "AASHTO Manual for Bridge Evaluation §6A (LRFR) + CDOT Bridge Rating Manual §9B — RF = (φc·φs·φ·Rn − γ·D)/(γLL·LL+IM), inventory 1.75 / operating 1.35 / Service III 0.80, beban aman & posting"}
           {tab === "handling" && "PCI Design Handbook 7th Ed. Ch.8 — Component Handling & Erection Bracing · stripping/transport/erection impact, two-point pickup, long-term camber multipliers"}
           {tab === "fire" && "PCI Design Handbook 7th Ed. Ch.10 + Abeles & Bardhan-Roy §16 + ACI 216.1 — Fire resistance · min thickness/cover by rating, strand strength retention k_θ, M_n,θ"}
           {tab === "lldf" && "Bridge Superstructure Design Ch.3 — AASHTO LRFD §4.6.2.2 Live-Load Distribution Factors · K_g longitudinal stiffness, interior/exterior, moment/shear, lever rule"}
           {tab === "diffsh" && "P.W. Abeles & B.K. Bardhan-Roy §11.5 / §11.7.4 (Evans & Parker) — Differential shrinkage in composite members · F_sh, M_cs, creep reduction (1−e^−φ)/φ, soffit tension"}
+          {tab === "aemm" && "Gilbert, Mickleborough & Ranzi 'Design of Prestressed Concrete to Eurocode 2' §5.7 / §5.11.4 — Age-Adjusted Effective Modulus Method (Trost–Bažant), restraint creep+susut+relaksasi, penampang transformasi age-adjusted"}
+          {tab === "special" && "N. Krishna Raju 'Prestressed Concrete' Bab 16 & 19 — pipa prategang melingkar (wire winding), tiang/pole prategang, bantalan rel (rail-seat & centre moment)"}
           {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · properti penampang terurut dimensi"}
         </div>
 
@@ -230,10 +262,14 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "ltb"     && <LateralStabilityCalculator />}
           {tab === "seg"     && <SegmentalCalculator />}
           {tab === "ext"     && <ExternalTendonCalculator />}
+          {tab === "curved"  && <CurvedTendonCalculator />}
+          {tab === "rating"  && <RatingCalculator />}
           {tab === "handling" && <HandlingCalculator />}
           {tab === "fire"    && <FireResistanceCalculator />}
           {tab === "lldf"    && <DistributionCalculator />}
           {tab === "diffsh"  && <DiffShrinkageCalculator />}
+          {tab === "aemm"    && <AEMMCalculator />}
+          {tab === "special" && <SpecialMembersCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

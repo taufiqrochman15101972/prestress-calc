@@ -430,4 +430,6 @@ export interface DesignResults {
   readonly pressureLine?: import("@/engine/preliminary").PressureLineResult;
   /** Eurocode 2 (EN 1992-1-1) design code — M.K. Hurst 2nd ed. */
   readonly ec2?: import("@/engine/ec2").EC2Result;
+  /** Dual design — Full (Class U) vs LRFD-Partial (Class C) side-by-side */
+  readonly dualMethod?: import("@/engine/dualmethod").DualMethodResult;
 }

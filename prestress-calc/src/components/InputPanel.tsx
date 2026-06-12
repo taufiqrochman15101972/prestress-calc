@@ -3,6 +3,7 @@
 import React, { useCallback } from "react";
 import { useDesignStore, resolveTendon } from "@/store/useDesignStore";
 import { GIRDER_PRESETS } from "@/lib/presets";
+import { STRAND_DB, suggestTendonLayout, tendonUnit, findStrand } from "@/lib/strands";
 import { girderHeight } from "@/engine/section";
 import { CloudModal } from "@/components/CloudModal";
 import type { TendonProfileType, ACIBeamClass } from "@/types";
@@ -316,6 +317,35 @@ export function InputPanel() {
               <option value="STRAIGHT">Lurus</option>
             </select>
           </div>
+          <div className="flex flex-col gap-0.5 col-span-2">
+            <Label>Strand Standar (ASTM A416 / AASHTO M203)</Label>
+            <select
+              value={
+                STRAND_DB.find(
+                  (s) => Math.abs(s.areaMm2 - tendon.singleStrandArea) < 0.05
+                    && Math.abs(s.diameterMm - tendon.strandDiameter) < 0.05
+                )?.id ?? "custom"
+              }
+              onChange={(e) => {
+                const s = findStrand(e.target.value);
+                if (s) {
+                  updateTendon({
+                    singleStrandArea: s.areaMm2, strandDiameter: s.diameterMm,
+                    fpu: s.fpu, fpy: s.fpy,
+                  });
+                  updateMaterial({ fpu: s.fpu, fpy: s.fpy });
+                }
+              }}
+              className="rounded border border-gray-300 bg-white px-2 py-1 text-xs
+                focus:outline-none focus:ring-1 focus:ring-blue-400">
+              <option value="custom">— Kustom (isi manual) —</option>
+              {STRAND_DB.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} · A={s.areaMm2} mm² · MBL={s.mblKn} kN
+                </option>
+              ))}
+            </select>
+          </div>
           <NumField label="Luas 1 Strand" unit="mm²" value={tendon.singleStrandArea} step={0.1}
             onChange={(v) => updateTendon({ singleStrandArea: v })} />
           <NumField label="Ø Strand" unit="mm" value={tendon.strandDiameter} step={0.5}
@@ -344,6 +374,30 @@ export function InputPanel() {
             <span className="text-blue-600">e midspan:</span>
             <span className="font-bold text-blue-800">{eccentricityMidspan.toFixed(1)} mm</span>
           </div>
+          {totalStrands > 0 && (() => {
+            // Multi-tendon PT arrangement (prioritized post-tensioned system)
+            const layout = suggestTendonLayout(totalStrands);
+            const s = STRAND_DB.find(
+              (x) => Math.abs(x.areaMm2 - tendon.singleStrandArea) < 0.05
+            ) ?? STRAND_DB[2]; // default 12.7 mm G270
+            const u = tendonUnit(layout.unitSize, s);
+            return (
+              <div className="border-t border-blue-200 pt-1 mt-1 space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="text-blue-600">Susunan PT multi-tendon:</span>
+                  <span className="font-bold text-blue-800">{layout.nTendons} × tendon-{layout.unitSize}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-600">Duct Ø dalam / MBL unit:</span>
+                  <span className="font-bold text-blue-800">{u.ductIdMm} mm · {u.mblKn} kN</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-600">P_jack 0.75fpu / maks 0.80fpu:</span>
+                  <span className="font-bold text-blue-800">{u.pJack075} / {u.pMax080} kN</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Tendon rows */}

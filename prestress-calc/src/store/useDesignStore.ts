@@ -16,6 +16,7 @@ import {
 import { computeTransferLength } from "@/engine/development";
 import { computeAnchorageZone } from "@/engine/anchorage";
 import { computeCrackWidth, crackedSectionSteel } from "@/engine/crackwidth";
+import { computeDualMethod } from "@/engine/dualmethod";
 import { computeTorsion, estimateAcpPcp, estimateAohPh } from "@/engine/torsion";
 import { computeContinuousBeam, computeMomentRedistribution } from "@/engine/continuous";
 import { computeFlexuralStages } from "@/engine/flexuralstages";
@@ -527,6 +528,21 @@ function runPipeline(
     ? (Aps * ulsFlexure.fps) / (Aps * ulsFlexure.fps + Math.max(material.As, 0) * material.fy)
     : 1.0;
 
+  // ── Dual design method — Full vs LRFD-Partial prestressing (side-by-side) ──
+  // The service fibre stresses are identical; only the allowable tension
+  // (0.5√f'c vs 1.0√f'c), the verdict and the cracked-section crack control
+  // differ. Always computed so the two philosophies sit beside each other.
+  const dualMethod = computeDualMethod({
+    sigmaTopService: sls.service.sigmaTop,
+    sigmaBotService: sls.service.sigmaBot,
+    fc: material.fc,
+    Mservice, Mcr,
+    Aps, fps: ulsFlexure.fps,
+    As: material.As, fy: material.fy,
+    jd: 0.9 * gross.yb,
+    bw: girder.b2,
+  });
+
   return {
     results: Object.freeze({
       gross,
@@ -558,6 +574,7 @@ function runPipeline(
       pressureLine,
       ec2,
       PPR: PPR_val,
+      dualMethod,
     }),
     errors: [],
   };

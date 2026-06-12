@@ -17,6 +17,7 @@
  *  14 Panjang Transfer & Pengembangan (ACI §25.8.8)
  *  15 Zona Angkur – Bursting & Spalling (AASHTO §5.10.9.3)
  *  16 PPR (Partial Prestress Ratio)
+ *  16A Dua Metode Berdampingan — Full (Class U) vs Partial (Class C/LRFD)
  *  17 Torsi (kondisional)
  *  18 Balok Menerus (kondisional)
  *  19 Daktilitas — εt ACI §21.2
@@ -34,6 +35,7 @@
 import type { ProjectInputs, DesignResults, AppSettings } from "@/types";
 import { girderHeight } from "@/engine/section";
 import { checkDuctility, checkMinSteel, checkFatigue } from "@/engine/uls";
+import { designSheetSVG } from "@/lib/designsheet";
 
 // ─── Formatting helpers ───────────────────────────────────────
 function n(v: number, d = 2)  { return v.toFixed(d); }
@@ -191,7 +193,7 @@ export function openPrintReport(
     flexuralStages: fst, mcftShear: mcft,
     momentRedistribution: mrd, lumpSumLosses: lsl,
     thermal: thg, elongation: elo, preliminary: prl, pressureLine: pl,
-    ec2,
+    ec2, dualMethod: dm,
   } = results;
 
   const h4 = girder.h4 ?? 0;
@@ -271,6 +273,13 @@ export function openPrintReport(
   Geser: ${us.isAdequate ? "✓" : "✗"} &nbsp;
   Antarmuka: ${ish.isAdequate ? "✓" : "✗"} &nbsp;
   Lendutan: ${defl.liveOk && defl.totalOk ? "✓" : "✗"}
+</div>
+
+<div class="section" style="page-break-after:always">
+  <div class="section-title">0. Lembar Desain Terpadu (Unified Design Sheet)</div>
+  <div style="border:1px solid #cbd5e1;border-radius:3px;overflow:hidden">
+    ${designSheetSVG(inputs, results)}
+  </div>
 </div>
 
 ${twoCol(
@@ -644,6 +653,48 @@ ${PPR !== undefined ? section("16. Partial Prestress Ratio (PPR)", `
       ${PPR >= 0.99 ? "Prategang penuh — semua tarik ditumpu oleh strand." : `Prategang sebagian — ${n((1-PPR)*100,1)}% kapasitas lentur dari tulangan mild A_s.`}
     </div>`
   )}
+`) : ""}
+
+${dm ? section("16A. Dua Metode Berdampingan — Prategang PENUH vs PARSIAL (LRFD)", `
+  <div class="note-box" style="margin-bottom:6px">
+    Tegangan serat layan identik untuk kedua filosofi — yang berbeda hanya
+    <strong>batas tarik izin</strong>, vonis, dan kontrol retak penampang retak.
+    Keduanya dihitung paralel agar dapat dibandingkan dan dipertukarkan.
+  </div>
+  ${twoCol(
+    `<div class="sub-title">A. PENUH — ACI Class U (tak retak)</div>` +
+    calc3("Batas tarik layan", "0.50·√f'c", `0.50·√${n(material.fc,0)}`, MPa(dm.full.limTens)) +
+    table(
+      row("σ atas layan", MPa(dm.sigmaTop)) +
+      row("σ bawah layan", MPa(dm.sigmaBot)) +
+      row("Batas tekan 0.45·f'c", MPa(-dm.full.limComp))
+    ) +
+    checkRow("σ_bawah ≤ +0.50√f'c", MPa(dm.sigmaBot), MPa(dm.full.limTens), dm.full.botSafe) +
+    `<div style="font-weight:700;color:${dm.full.safe ? "#15803d" : "#dc2626"};margin-top:3px">
+      ${dm.full.safe ? "✓ MEMENUHI PRATEGANG PENUH" : "✗ OVERSTRESS — perlu metode parsial / revisi"}
+    </div>`,
+    `<div class="sub-title">B. PARSIAL — Class C / AASHTO LRFD (boleh retak)</div>` +
+    calc3("Batas tarik layan", "1.00·√f'c", `1.00·√${n(material.fc,0)}`, MPa(dm.partial.limTens)) +
+    calc3("Modulus retak f_r", "0.62·√f'c", `0.62·√${n(material.fc,0)}`, MPa(dm.fr)) +
+    table(
+      row("Status penampang", dm.partial.cracked ? "RETAK (σ_b > f_r)" : "tak retak") +
+      (dm.partial.cracked
+        ? row("f_s baja penampang retak", MPa(dm.partial.fsSteel)) +
+          row("Lebar retak w_cr (Gergely–Lutz)", mm(dm.partial.crackWidthMm)) +
+          row("A_s perlu utk w ≤ 0.30 mm", mm2(dm.partial.AsForCrack))
+        : "") +
+      row("PPR", `${n(dm.partial.PPR * 100, 1)}`, "%")
+    ) +
+    (dm.partial.cracked
+      ? checkRow("w_cr ≤ 0.30 mm (eksterior)", mm(dm.partial.crackWidthMm), "0.30 mm", dm.partial.crackOk)
+      : "") +
+    `<div style="font-weight:700;color:${dm.partial.safe ? "#15803d" : "#dc2626"};margin-top:3px">
+      ${dm.partial.safe ? "✓ MEMENUHI PRATEGANG PARSIAL (LRFD)" : "✗ OVERSTRESS PARSIAL"}
+    </div>`
+  )}
+  <div class="info-box" style="margin-top:6px">
+    <strong>Kesimpulan:</strong> ${dm.governs}
+  </div>
 `) : ""}
 
 ${tor ? section("17. Kontrol Torsi (ACI 318-19 §22.7)", `

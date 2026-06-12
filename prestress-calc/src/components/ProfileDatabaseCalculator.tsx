@@ -3,10 +3,12 @@
 import React, { useState, useMemo } from "react";
 import { GIRDER_PRESETS, CATEGORY_LABEL } from "@/lib/presets";
 import type { PresetCategory } from "@/lib/presets";
+import { STRAND_DB, tendonUnitTable } from "@/lib/strands";
 import { calculateGrossProperties, girderHeight } from "@/engine/section";
 import type { IGirderGeometry } from "@/types";
 
 type SortKey = "H" | "A" | "Ig" | "eff" | "name";
+type DbView = "profiles" | "strands";
 
 /** Symmetric section polygon (bottom→top) for a mini sketch. */
 function sectionPoints(g: IGirderGeometry, scale: number, cx: number, oy: number): string {
@@ -34,7 +36,93 @@ function sectionPoints(g: IGirderGeometry, scale: number, cx: number, oy: number
   return pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 }
 
+// ─── Strand & multi-strand PT tendon database view ──────────
+function StrandDatabase() {
+  const [strandId, setStrandId] = useState<string>("12.70-1860");
+  const s = STRAND_DB.find(x => x.id === strandId) ?? STRAND_DB[2];
+  const units = tendonUnitTable(s);
+  return (
+    <div className="space-y-3 text-[11px]">
+      <div>
+        <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">
+          Strand 7-Kawat Low-Relaxation — ASTM A416/A416M (AASHTO M203)
+        </p>
+        <table className="w-full">
+          <thead className="bg-gray-100">
+            <tr className="text-[9px] text-gray-600">
+              <th className="text-left py-1 px-1">Strand</th>
+              <th className="text-right px-1">Ø (mm)</th>
+              <th className="text-right px-1">A_ps (mm²)</th>
+              <th className="text-right px-1">f_pu (MPa)</th>
+              <th className="text-right px-1">f_py (MPa)</th>
+              <th className="text-right px-1">MBL (kN)</th>
+              <th className="text-right px-1">massa (kg/m)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {STRAND_DB.map(x => (
+              <tr key={x.id} onClick={() => setStrandId(x.id)}
+                className={`cursor-pointer border-b border-gray-100 ${strandId === x.id ? "bg-blue-50" : "hover:bg-gray-50"}`}>
+                <td className="py-0.5 px-1 text-[10px] font-semibold text-gray-800">{x.name}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{x.diameterMm.toFixed(2)}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{x.areaMm2.toFixed(1)}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{x.fpu}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{x.fpy}</td>
+                <td className="text-right px-1 font-mono text-[10px] text-blue-700 font-semibold">{x.mblKn.toFixed(1)}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{x.massKgM.toFixed(3)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-[9px] text-gray-400 mt-0.5">
+          MBL = f_pu·A_ps (gaya putus minimum) · f_py = 0.90·f_pu (low-relaxation) · E_ps ≈ 196 500 MPa.
+          Klik baris untuk membangun tabel unit tendon.
+        </p>
+      </div>
+      <div>
+        <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">
+          Unit Tendon Multi-Strand Pasca-Tarik — basis {s.name}
+        </p>
+        <table className="w-full">
+          <thead className="bg-gray-100">
+            <tr className="text-[9px] text-gray-600">
+              <th className="text-left py-1 px-1">Unit</th>
+              <th className="text-right px-1">n strand</th>
+              <th className="text-right px-1">ΣA_ps (mm²)</th>
+              <th className="text-right px-1">MBL (kN)</th>
+              <th className="text-right px-1">P_jack 0.75f_pu (kN)</th>
+              <th className="text-right px-1">P_maks 0.80f_pu (kN)</th>
+              <th className="text-right px-1">Duct Ø_dlm (mm)</th>
+              <th className="text-right px-1">massa (kg/m)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {units.map(u => (
+              <tr key={u.nStrands} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="py-0.5 px-1 text-[10px] font-semibold text-gray-800">Tendon-{u.nStrands}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{u.nStrands}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{u.apsMm2.toFixed(0)}</td>
+                <td className="text-right px-1 font-mono text-[10px] text-blue-700 font-semibold">{u.mblKn}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{u.pJack075}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{u.pMax080}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{u.ductIdMm}</td>
+                <td className="text-right px-1 font-mono text-[10px]">{u.massKgM.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-[9px] text-gray-400 mt-0.5">
+          Ukuran unit komersial standar (4–37 strand). Duct dari A_duct ≥ 2.5·ΣA_ps
+          (AASHTO LRFD §5.4.6.2, rasio isi ≤ 0.40), dibulatkan ke 5 mm.
+          Batas jacking: 0.80·f_pu sesaat di ram, 0.75·f_pu umum (ACI 318 §20.3.2.5).
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ProfileDatabaseCalculator() {
+  const [view, setView] = useState<DbView>("profiles");
   const [sortKey, setSortKey] = useState<SortKey>("H");
   const [cat, setCat] = useState<PresetCategory | "ALL">("ALL");
   const [selId, setSelId] = useState<string>("wika_wf40");
@@ -62,7 +150,30 @@ export function ProfileDatabaseCalculator() {
   const f = (v: number, d = 1) => v.toFixed(d);
   const e = (v: number, d = 3) => v.toExponential(d);
 
+  const viewToggle = (
+    <div className="flex gap-1 mb-2">
+      {([["profiles", "📐 Profil Girder"], ["strands", "🔗 Strand & Tendon PT"]] as [DbView, string][]).map(([k, label]) => (
+        <button key={k} onClick={() => setView(k)}
+          className={`px-2 py-1 rounded text-[10px] font-semibold border
+            ${view === k ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (view === "strands") {
+    return (
+      <div>
+        {viewToggle}
+        <StrandDatabase />
+      </div>
+    );
+  }
+
   return (
+    <div>
+    {viewToggle}
     <div className="flex gap-4 text-[11px]">
       {/* ── Selected profile preview ─────────────────────── */}
       <div className="w-56 flex-none space-y-2">
@@ -148,6 +259,7 @@ export function ProfileDatabaseCalculator() {
         </div>
         <p className="text-[9px] text-gray-400 mt-1">Klik baris untuk pratinjau penampang. ρ = r²/(y_t·y_b) — makin tinggi makin efisien (Nilson §4.3). Satuan SI: mm, mm², mm³, mm⁴.</p>
       </div>
+    </div>
     </div>
   );
 }

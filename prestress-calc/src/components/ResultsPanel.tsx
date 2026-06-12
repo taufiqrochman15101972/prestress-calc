@@ -10,6 +10,7 @@ import { useDesignStore, resolveTendon } from "@/store/useDesignStore";
 import { fmt, fmtStress } from "@/lib/utils";
 import { checkDuctility, checkMinSteel, checkFatigue, PCI_MULTIPLIERS } from "@/engine/uls";
 import { DeflectionChart } from "@/components/DeflectionChart";
+import { DesignSheet } from "@/components/DesignSheet";
 import { MagnelDiagram } from "@/components/MagnelDiagram";
 import { TendonZoneChart } from "@/components/TendonZoneChart";
 import type { FiberStressResult, DesignResults } from "@/types";
@@ -199,6 +200,90 @@ function LossesTab({ r }: { r: DesignResults }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Dual design method — Full vs LRFD-Partial side-by-side ───
+function DualMethodBlock({ d }: { d: import("@/engine/dualmethod").DualMethodResult }) {
+  const col = (
+    title: string,
+    sub: string,
+    limTens: number,
+    safe: boolean,
+    body: React.ReactNode,
+    active: boolean,
+  ) => (
+    <div className={`flex-1 min-w-[180px] rounded border ${active ? "border-indigo-400 ring-1 ring-indigo-200" : "border-gray-200"} ${safe ? "bg-green-50/40" : "bg-red-50/40"}`}>
+      <div className={`px-2 py-1 rounded-t ${safe ? "bg-green-100" : "bg-red-100"}`}>
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[10px] font-bold text-gray-700">{title}</span>
+          <Badge variant={safe ? "success" : "danger"} className="text-[8px] px-1 py-0">
+            {safe ? "MEMENUHI" : "OVERSTRESS"}
+          </Badge>
+        </div>
+        <div className="text-[8.5px] text-gray-500">{sub}</div>
+        <div className="text-[8.5px] font-mono text-indigo-700">batas tarik = +{limTens.toFixed(2)} MPa</div>
+      </div>
+      <div className="px-2 py-1">{body}</div>
+    </div>
+  );
+
+  const stressRows = (limTens: number) => (
+    <table className="w-full"><tbody>
+      <ResultRow label="σ atas (layan)" value={fmtStress(d.sigmaTop)} unit="MPa" />
+      <ResultRow label="σ bawah (layan)" value={fmtStress(d.sigmaBot)} unit="MPa" />
+      <CheckRow label="σ bawah ≤ batas tarik"
+        value={fmtStress(d.sigmaBot)} limit={`+${limTens.toFixed(2)}`}
+        ok={d.sigmaBot <= limTens} unit="MPa" />
+    </tbody></table>
+  );
+
+  return (
+    <>
+      <p className="text-[9px] font-bold uppercase text-gray-400 pt-1">
+        Dua Metode Berdampingan — Prategang PENUH vs PARSIAL (LRFD)
+      </p>
+      <div className="flex gap-2 flex-wrap">
+        {col(
+          "PENUH (Class U)",
+          "Tak retak · ACI 318 §24.5.2",
+          d.full.limTens,
+          d.full.safe,
+          stressRows(d.full.limTens),
+          d.full.safe,
+        )}
+        {col(
+          "PARSIAL (Class C / LRFD)",
+          "Boleh retak · kontrol lebar retak",
+          d.partial.limTens,
+          d.partial.safe,
+          <>
+            {stressRows(d.partial.limTens)}
+            <table className="w-full mt-0.5"><tbody>
+              <ResultRow label="f_r = 0.62√f'c (retak)" value={fmtStress(d.fr)} unit="MPa" />
+              <ResultRow label="Status penampang" value={d.partial.cracked ? "RETAK" : "tak retak"} />
+              {d.partial.cracked && (
+                <>
+                  <ResultRow label="f_s baja (penampang retak)" value={fmt(d.partial.fsSteel, 0)} unit="MPa" />
+                  <ResultRow label="PPR = Aps·fps/(Aps·fps+As·fy)" value={fmt(d.partial.PPR * 100, 1)} unit="%" />
+                </>
+              )}
+            </tbody></table>
+            {d.partial.cracked && (
+              <table className="w-full mt-0.5"><tbody>
+                <CheckRow label="w_cr ≤ 0.30 mm (eksterior)"
+                  value={fmt(d.partial.crackWidthMm, 3)} limit="0.300"
+                  ok={d.partial.crackOk} unit="mm" />
+              </tbody></table>
+            )}
+          </>,
+          !d.full.safe && d.partial.safe,
+        )}
+      </div>
+      <div className="text-[9px] text-gray-500 pl-1 bg-amber-50 border-l-2 border-amber-300 py-1 px-2">
+        <span className="font-semibold">Governs:</span> {d.governs}
+      </div>
+    </>
   );
 }
 
@@ -685,6 +770,9 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
         </>
       )}
 
+      {/* Dual method — Full vs LRFD-Partial side-by-side */}
+      {r.dualMethod && <DualMethodBlock d={r.dualMethod} />}
+
       {/* Torsion */}
       {r.torsion && (
         <>
@@ -841,7 +929,7 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
 
 // ─── Main ResultsPanel ────────────────────────────────────────
 
-type TabKey = "section" | "moments" | "losses" | "sls" | "uls";
+type TabKey = "section" | "moments" | "losses" | "sls" | "uls" | "sheet";
 
 export function ResultsPanel() {
   // ── ALL hooks MUST be called before any early return ─────────
@@ -861,6 +949,7 @@ export function ResultsPanel() {
     { key: "losses",   label: "Kehilangan" },
     { key: "sls",      label: "SLS" },
     { key: "uls",      label: "ULS" },
+    { key: "sheet",    label: "📋 Lembar" },
   ];
 
   // Error state
@@ -923,8 +1012,9 @@ export function ResultsPanel() {
       {/* ── Main body: left tabs + right diagrams ── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
 
-        {/* ── Left: tab content (55%) ── */}
-        <div className="flex flex-col overflow-hidden min-w-0" style={{ flex: "0 0 52%" }}>
+        {/* ── Left: tab content (55%; full width for the design sheet) ── */}
+        <div className="flex flex-col overflow-hidden min-w-0"
+          style={{ flex: tab === "sheet" ? "1 1 100%" : "0 0 52%" }}>
           <div className="flex-none flex border-b border-gray-200 bg-white">
             {tabs.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
@@ -940,10 +1030,12 @@ export function ResultsPanel() {
             {tab === "losses"   && <LossesTab   r={results} />}
             {tab === "sls"      && <SLSTab      r={results} formulaVariant={settings.formulaVariant} />}
             {tab === "uls"      && <ULSTab      r={results} inputs={inputs} />}
+            {tab === "sheet"    && <DesignSheet inputs={inputs} results={results} />}
           </div>
         </div>
 
-        {/* ── Right: visual diagrams (48%) ── */}
+        {/* ── Right: visual diagrams (48%) — hidden on the design sheet ── */}
+        {tab !== "sheet" && (
         <div className="flex flex-col border-l border-gray-200 bg-gray-50 overflow-y-auto"
           style={{ flex: "0 0 48%" }}>
 
@@ -1021,6 +1113,7 @@ export function ResultsPanel() {
           </div>
 
         </div>
+        )}
       </div>
     </div>
   );
