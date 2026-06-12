@@ -867,6 +867,15 @@ ${mcft ? section("22. Geser — Metode Umum / Compression Field Theory (Nilson �
     <span class="check-value">${kN(mcft.Vn)} ≤ ${kN(mcft.Vn_max)}</span>
     <span>${check(mcft.Vn <= mcft.Vn_max)}</span>
   </div>
+  ${calc3("Tie longitudinal — geser menambah tarik baja lentur (AASHTO §5.7.3.5)",
+    "T_req = M_u/(d_v·φ_f) + 0.5N_u/φ_f + (V_u/φ_v − V_p − 0.5V_s)·cotθ ; T_cap = A_ps·f_ps + A_s·f_y",
+    `T_req = ${kN(mcft.T_req)} ; T_cap = ${kN(mcft.T_cap)}`,
+    `${kN(mcft.T_cap)} ${mcft.longTieOk ? "≥" : "<"} ${kN(mcft.T_req)}`)}
+  <div class="check-row ${mcft.longTieOk?"":"fail"}">
+    <span class="check-label">A_ps·f_ps + A_s·f_y ≥ T_req</span>
+    <span class="check-value">${kN(mcft.T_cap)} ≥ ${kN(mcft.T_req)}</span>
+    <span>${check(mcft.longTieOk)}</span>
+  </div>
 `) : ""}
 
 ${mrd ? section("23. Redistribusi Momen — Analisis Batas (Nilson §8.10, ACI §6.6.5)", `

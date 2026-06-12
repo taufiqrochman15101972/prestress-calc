@@ -391,6 +391,7 @@ function runPipeline(
     fc: material.fc, bv: bw, dv,
     Aps, As: material.As, fpu: tendon.fpu, Ep: material.Eps,
     fyt: material.fys, AvPerS: ulsShear.AvPerS,
+    fps: ulsFlexure.fps, fyLong: material.fy,
   });
 
   // Moment redistribution for continuous members (Nilson §8.10)

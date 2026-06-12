@@ -541,9 +541,13 @@ function ULSTab({ r, inputs }: { r: DesignResults; inputs: import("@/types").Pro
               ok={r.mcftShear.isAdequate} unit="kN" />
             <CheckRow label="V_n ≤ V_n,max (0.25f'c·bv·dv)" value={fmt(r.mcftShear.Vn)} limit={fmt(r.mcftShear.Vn_max)}
               ok={r.mcftShear.Vn <= r.mcftShear.Vn_max} unit="kN" />
+            <CheckRow label="Tie longitudinal: Aps·fps+As·fy ≥ T_req (AASHTO §5.7.3.5)"
+              value={fmt(r.mcftShear.T_cap)} limit={fmt(r.mcftShear.T_req)}
+              ok={r.mcftShear.longTieOk} unit="kN" />
           </tbody></table>
           <div className="text-[9px] text-gray-400 pl-1 -mt-1">
             Metode sectional alternatif Vci/Vcw — truss sudut-variabel (f_po=0.70fpu).
+            Geser menambah tarik pada baja lentur: T_req = M/(dv·φf) + 0.5N/φf + (V/φv − Vp − 0.5Vs)·cotθ.
           </div>
         </>
       )}

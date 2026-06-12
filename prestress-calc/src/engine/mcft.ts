@@ -21,6 +21,12 @@
  * fpo ≈ 0.70·fpu (locked-in strand stress, AASHTO C5.7.3.4.2).
  * εx is clamped to [−0.40, 6.0] ×10⁻³; if negative, the concrete in
  * the tension half stiffens the response (denominator includes Ec·Act).
+ *
+ * Also the LONGITUDINAL-REINFORCEMENT tie check (AASHTO §5.7.3.5,
+ * FHWA NHI-04-043 design step 5.7.6): shear demands extra tension in
+ * the flexural steel —
+ *   T_req = |Mu|/(dv·φf) + 0.5·Nu/φf + (|Vu/φv − Vp| − 0.5·Vs)·cotθ
+ *   T_cap = Aps·fps + As·fy   ≥ T_req
  */
 
 export interface MCFTInputs {
@@ -56,6 +62,12 @@ export interface MCFTInputs {
   phi?: number;
   /** Lightweight factor λ (default 1.0) */
   lambda?: number;
+  /** Strand stress at strength f_ps for the tie check (MPa, default 0.90·fpu) */
+  fps?: number;
+  /** Longitudinal mild-steel yield f_y (MPa, default 420) */
+  fyLong?: number;
+  /** φ flexure for the tie check (default 0.90) */
+  phiF?: number;
 }
 
 export interface MCFTResult {
@@ -81,12 +93,19 @@ export interface MCFTResult {
   readonly fpo: number;
   /** Adequate? φVn ≥ Vu */
   readonly isAdequate: boolean;
+  // ── Longitudinal-reinforcement tie check (AASHTO §5.7.3.5) ──
+  /** Required longitudinal tension from M + N + V (kN) */
+  readonly T_req: number;
+  /** Capacity Aps·fps + As·fy (kN) */
+  readonly T_cap: number;
+  readonly longTieOk: boolean;
 }
 
 export function computeMCFT(inp: MCFTInputs): MCFTResult {
   const {
     Vu, Mu, Nu, Vp, fc, bv, dv, Aps, As, fpu, Ep,
     Es = 200_000, fyt, AvPerS = 0, phi = 0.75, lambda = 1.0,
+    fps = 0.90 * inp.fpu, fyLong = 420, phiF = 0.90,
   } = inp;
 
   const fpo = 0.70 * fpu;
@@ -141,6 +160,17 @@ export function computeMCFT(inp: MCFTInputs): MCFTResult {
   const Vn = VnN / 1000;
   const phiVn = phi * Vn;
 
+  // ── Longitudinal-reinforcement tie check (AASHTO §5.7.3.5) ──
+  // Vs in the tie equation must not exceed Vu/φv.
+  const VsTie_N = Math.min(VsN, VuN / phi);
+  const Treq_N =
+    MuNmm / (dv * phiF) +
+    (0.5 * NuN) / phiF +
+    (Math.abs(VuN / phi - VpN) - 0.5 * VsTie_N) * cotTheta;
+  const Tcap_N = Aps * fps + As * fyLong;
+  const T_req = Treq_N / 1000;
+  const T_cap = Tcap_N / 1000;
+
   return Object.freeze({
     epsilon_x,
     beta,
@@ -153,5 +183,8 @@ export function computeMCFT(inp: MCFTInputs): MCFTResult {
     AvPerS_req,
     fpo,
     isAdequate: phiVn >= Vu,
+    T_req,
+    T_cap,
+    longTieOk: T_cap >= T_req,
   });
 }

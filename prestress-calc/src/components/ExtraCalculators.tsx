@@ -24,8 +24,10 @@ import { AEMMCalculator } from "@/components/AEMMCalculator";
 import { SpecialMembersCalculator } from "@/components/SpecialMembersCalculator";
 import { CurvedTendonCalculator } from "@/components/CurvedTendonCalculator";
 import { RatingCalculator } from "@/components/RatingCalculator";
+import { SplicedGirderCalculator } from "@/components/SplicedGirderCalculator";
+import { FatigueCalculator } from "@/components/FatigueCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "ext" | "curved" | "handling" | "fire" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "profiles";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "profiles";
 
 interface Props {
   open: boolean;
@@ -112,6 +114,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Kantilever seimbang + peluncuran bertahap, redistribusi rangkak + estimasi awal layout PT (Hewson §13/§15, PTI §2.7, ASPIRE)",
   },
   {
+    key: "spliced",
+    emoji: "🧩",
+    title: "Gelagar Spliced — PT 2 Tahap",
+    subtitle: "Akumulasi tegangan pracetak→komposit, joint closure, reduksi geser duct λ_duct (Ronald PCI J. 2001, TxDOT 0-6652, WSDOT §5.9)",
+  },
+  {
     key: "ext",
     emoji: "🪢",
     title: "Prategang Eksternal",
@@ -134,6 +142,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     emoji: "🔥",
     title: "Ketahanan Api",
     subtitle: "Tebal & cover min per rating, k_θ retensi strand, M_n,θ ≥ M_fire (PCI Ch.10 / Abeles §16 / ACI 216)",
+  },
+  {
+    key: "fatigue",
+    emoji: "🔁",
+    title: "Fatik Strand & Tulangan",
+    subtitle: "Fatigue I — saringan tak-retak 0.25√f'c, Δf_p vs ΔF_TH per radius, tulangan 166−0.33f_min (AASHTO §5.5.3, FHWA NHI step 5.6.6)",
   },
   {
     key: "lldf",
@@ -235,6 +249,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "ltb" && "P.W. Abeles & B.K. Bardhan-Roy, Prestressed Concrete Designer's Handbook 3rd Ed. §13.3 — Stability problems · Timoshenko 'Theory of Elastic Stability' · W_cr=(K/L²)√(B₁C), FS≥3"}
           {tab === "seg" && "Nigel R. Hewson, Prestressed Concrete Bridges §13/§15 + PTI Post-Tensioning Manual §2.7 — Balanced cantilever, incremental launching, creep redistribution on system change"}
           {tab === "ext" && "Nigel R. Hewson, Prestressed Concrete Bridges §6–7 + PTI Post-Tensioning Manual §3.2.3 — External post-tensioning · polygonal tendon, deviator forces, 2nd-order eccentricity, ACI unbonded f_ps"}
+          {tab === "spliced" && "Hugh D. Ronald, 'Design and Construction Considerations for Continuous Post-Tensioned Bulb-Tee Girder Bridges' (PCI Journal 2001) + TxDOT 0-6652-1 (Bayrak/Jirsa, geser duct) + WSDOT BDM §5.9 — PT 2 tahap: tahap-1 non-komposit, tahap-2 komposit, joint closure tanpa pretension, λ_duct = 1−2(Ø/b_w)²"}
+          {tab === "fatigue" && "FHWA NHI-04-043/044 'Comprehensive Design Example' step 5.6.6 / AASHTO LRFD §5.5.3 — Fatigue I: saringan tak-retak 0.25√f'c, rentang tegangan strand vs ΔF_TH per radius kelengkungan, tulangan ΔF_TH = 166 − 0.33·f_min"}
           {tab === "curved" && "Stone & Breen, CTR 208-3F 'Design of Post-Tensioned Girder Anchorage Zones' + Powell/Breen/Kreger CTR 365-1 (deviator & radius duct) — gaya radial tendon melengkung F=P_u/R, multistrand side-face, geser cover d_eff, tieback (AASHTO LRFD §5.9.5.4.3)"}
           {tab === "rating" && "AASHTO Manual for Bridge Evaluation §6A (LRFR) + CDOT Bridge Rating Manual §9B — RF = (φc·φs·φ·Rn − γ·D)/(γLL·LL+IM), inventory 1.75 / operating 1.35 / Service III 0.80, beban aman & posting"}
           {tab === "handling" && "PCI Design Handbook 7th Ed. Ch.8 — Component Handling & Erection Bracing · stripping/transport/erection impact, two-point pickup, long-term camber multipliers"}
@@ -261,8 +277,10 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "load"    && <BridgeLoadCalculator />}
           {tab === "ltb"     && <LateralStabilityCalculator />}
           {tab === "seg"     && <SegmentalCalculator />}
+          {tab === "spliced" && <SplicedGirderCalculator />}
           {tab === "ext"     && <ExternalTendonCalculator />}
           {tab === "curved"  && <CurvedTendonCalculator />}
+          {tab === "fatigue" && <FatigueCalculator />}
           {tab === "rating"  && <RatingCalculator />}
           {tab === "handling" && <HandlingCalculator />}
           {tab === "fire"    && <FireResistanceCalculator />}
