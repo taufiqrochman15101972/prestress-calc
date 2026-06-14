@@ -80,6 +80,148 @@ export function dynamicAllowance(L: number): number {
   return 0.40 - 0.0025 * (L - 50);
 }
 
+// ════════════════════════════════════════════════════════════════
+// AASHTO vehicular live load — PCI Bridge Design Manual §8.11 + Ch.7
+// (HS20 design truck, HL-93 = truck/tandem + 0.64 kip/ft lane,
+//  LRFD fatigue truck with 30-ft constant axle spacing)
+//
+// Closed-form per-lane maxima at any section x of a SIMPLE span
+// (PCI BDM Tables 8.11.1-1/2, 8.11.3-1 — formulas in ft·kip / kip,
+// converted to SI on output):
+//   HS20 truck  M(x): x/L ≤ ⅓ : 72x[(L−x)−9.33]/L          (L ≥ 28 ft)
+//               x/L > ⅓ : 72x[(L−x)−4.67]/L − 112          (x ≥ 14 ft)
+//   HS20 truck  V(x) = max{ 72[(L−x)−9.33]/L ,  72[(L−x)−4.67]/L − 8 }
+//   Tandem (2×25 kip @ 4 ft):  M = 50x(L−x−2)/L ;  V = 50(L−x−2)/L
+//   Lane 0.64 k/ft:  M = 0.64x(L−x)/2 ;  V = 0.64(L−x)²/(2L)
+//   Fatigue truck M(x): x/L ≤ 0.241 : 72x[(L−x)−18.22]/L   (L ≥ 44 ft)
+//               x/L > 0.241 : 72x[(L−x)−11.78]/L − 112
+//   HL-93: M = max(truck, tandem)·(1+IM) + lane, IM = 0.33 (fatigue 0.15)
+//
+// Output feeds the per-girder design via the LRFD distribution factor
+// g (see engine/distribution.ts) — drop-in alternative to the SNI "D"
+// load above. Internal: US formulas, SI in/out (m, kN, kN·m).
+// ════════════════════════════════════════════════════════════════
+
+const FT = 0.3048;            // m per ft
+const FTKIP = 1.355818;       // kN·m per ft·kip
+const KIP = 4.448222;         // kN per kip
+
+export interface AashtoLiveLoadInputs {
+  /** Simple-span length L (m) */
+  L: number;
+  /** Section position ratio x/L for moment (0.5 = midspan governs) */
+  xRatio: number;
+  /** Moment distribution factor g_M (lanes/girder), from distribution.ts */
+  gM: number;
+  /** Shear distribution factor g_V (lanes/girder) */
+  gV: number;
+  /** Dynamic load allowance on truck/tandem (LRFD 0.33) */
+  IM: number;
+}
+
+export interface AashtoLiveLoadResult {
+  // per-lane, NO impact (kN·m / kN)
+  readonly M_truck: number;
+  readonly M_tandem: number;
+  readonly M_lane: number;
+  readonly V_truck: number;
+  readonly V_tandem: number;
+  readonly V_lane: number;
+  readonly M_fatigue: number;     // fatigue truck, per lane, no impact
+  // HL-93 combination per lane (incl. IM on vehicle)
+  readonly governsVehicle: "TRUCK" | "TANDEM";
+  readonly M_HL93_lane: number;
+  readonly V_HL93_lane: number;
+  // per girder (× g)
+  readonly M_HL93_girder: number;
+  readonly V_HL93_girder: number;
+  readonly M_fatigue_girder: number; // incl. 15% IM, × g_M
+  /** Equivalent uniform load giving the same girder moment (kN/m) */
+  readonly wLive_equiv: number;
+}
+
+/** HS20 truck per-lane maximum moment at x (ft) on span L (ft), ft·kip. */
+export function hs20TruckMoment(L: number, x: number): number {
+  const xr = Math.min(x, L - x) / L;             // symmetric
+  const xs = Math.min(x, L - x);
+  if (L < 28) {
+    // span shorter than the 14+14 ft axle train — single 32-kip axle governs
+    return (32 * xs * (L - xs)) / L;
+  }
+  void xr;
+  const m1 = (72 * xs * ((L - xs) - 9.33)) / L;            // all 3 axles on span
+  const m2 = (72 * xs * ((L - xs) - 4.67)) / L - 112;      // rear axle pair
+  return Math.max(m1, m2, 0);                               // envelope of the two
+}
+
+/** HS20 truck per-lane maximum shear at x (ft) on span L (ft), kip. */
+export function hs20TruckShear(L: number, x: number): number {
+  if (L < 28) return (32 * (L - x)) / L;
+  const v1 = (72 * ((L - x) - 9.33)) / L;        // full train on span
+  const v2 = (72 * ((L - x) - 4.67)) / L - 8;    // rear axles only
+  return Math.max(v1, v2, 0);
+}
+
+/** LRFD design tandem (2 × 25 kip @ 4 ft) maximum moment, ft·kip. */
+export function tandemMoment(L: number, x: number): number {
+  const xs = Math.min(x, L - x);
+  if (L <= 4) return (50 * xs * (L - xs)) / L / 2;
+  return (50 * xs * (L - xs - 2)) / L;
+}
+
+/** LRFD design tandem maximum shear at x, kip. */
+export function tandemShear(L: number, x: number): number {
+  if (L <= 4) return 25;
+  return Math.max((50 * (L - x - 2)) / L, 0);
+}
+
+/** LRFD fatigue truck (32-kip axles @ 30 ft) maximum moment, ft·kip. */
+export function fatigueTruckMoment(L: number, x: number): number {
+  const xs = Math.min(x, L - x);
+  const xr = xs / L;
+  if (L < 44) {
+    // rear+front cannot both be on a short span at full effect — use the
+    // two-axle expression when valid, else single axle
+    if (L >= 28 && xs >= 14) return (72 * xs * ((L - xs) - 11.78)) / L - 112;
+    return (32 * xs * (L - xs)) / L;
+  }
+  if (xr <= 0.241) return (72 * xs * ((L - xs) - 18.22)) / L;
+  return (72 * xs * ((L - xs) - 11.78)) / L - 112;
+}
+
+export function computeAashtoLiveLoad(inp: AashtoLiveLoadInputs): AashtoLiveLoadResult {
+  const Lft = inp.L / FT;
+  const xM = inp.xRatio * Lft;          // moment section (ft)
+  const xV = 0;                         // shear at the support face → x = 0
+
+  const M_truck = hs20TruckMoment(Lft, xM) * FTKIP;
+  const M_tandem = tandemMoment(Lft, xM) * FTKIP;
+  const M_lane = ((0.64 * xM * (Lft - xM)) / 2) * FTKIP;
+  const V_truck = hs20TruckShear(Lft, xV) * KIP;
+  const V_tandem = tandemShear(Lft, xV) * KIP;
+  const V_lane = ((0.64 * (Lft - xV) ** 2) / (2 * Lft)) * KIP;
+  const M_fatigue = fatigueTruckMoment(Lft, xM) * FTKIP;
+
+  const governsVehicle: "TRUCK" | "TANDEM" = M_tandem > M_truck ? "TANDEM" : "TRUCK";
+  const M_veh = Math.max(M_truck, M_tandem);
+  const V_veh = Math.max(V_truck, V_tandem);
+  const M_HL93_lane = M_veh * (1 + inp.IM) + M_lane;
+  const V_HL93_lane = V_veh * (1 + inp.IM) + V_lane;
+
+  const M_HL93_girder = M_HL93_lane * inp.gM;
+  const V_HL93_girder = V_HL93_lane * inp.gV;
+  const M_fatigue_girder = M_fatigue * 1.15 * inp.gM;   // fatigue IM = 15%
+
+  const wLive_equiv = (8 * M_HL93_girder) / inp.L ** 2;
+
+  return Object.freeze({
+    M_truck, M_tandem, M_lane, V_truck, V_tandem, V_lane, M_fatigue,
+    governsVehicle, M_HL93_lane, V_HL93_lane,
+    M_HL93_girder, V_HL93_girder, M_fatigue_girder,
+    wLive_equiv,
+  });
+}
+
 export function computeBridgeLoad(inp: BridgeLoadInputs): BridgeLoadResult {
   const { L, bTrib, btrFactor, girderDF } = inp;
 

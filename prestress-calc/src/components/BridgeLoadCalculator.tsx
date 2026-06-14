@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computeBridgeLoad } from "@/engine/bridgeload";
-import type { BridgeLoadInputs } from "@/engine/bridgeload";
+import { computeBridgeLoad, computeAashtoLiveLoad } from "@/engine/bridgeload";
+import type { BridgeLoadInputs, AashtoLiveLoadInputs } from "@/engine/bridgeload";
 
 const DEFAULT: BridgeLoadInputs = {
   L: 25, bTrib: 1.85, btrFactor: 1.0, girderDF: 1.0,
@@ -139,6 +139,56 @@ export function BridgeLoadCalculator() {
           <span className="text-green-800">w<sub>Live</sub> ekivalen (= 8·M_live/L²) untuk panel utama:</span>
           <span className="font-mono font-bold text-green-700">{f(res.wLive_equiv, 2)} kN/m</span>
         </div>
+
+        <Hl93Block L={inp.L} />
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// AASHTO HL-93 / HS20 per-lane formulas — PCI BDM §8.11 + Ch.7
+// ════════════════════════════════════════════════════════════════
+function Hl93Block({ L }: { L: number }) {
+  const [inp, setInp] = useState<Omit<AashtoLiveLoadInputs, "L">>({
+    xRatio: 0.5, gM: 0.6, gV: 0.7, IM: 0.33,
+  });
+  const set = (k: keyof Omit<AashtoLiveLoadInputs, "L">, v: number) =>
+    setInp(p => ({ ...p, [k]: v }));
+  const r = useMemo(() => computeAashtoLiveLoad({ L, ...inp }), [L, inp]);
+  const f = (v: number, d = 1) => v.toFixed(d);
+
+  return (
+    <div className="border-t border-gray-200 pt-2 space-y-1.5">
+      <p className="text-[9px] font-bold uppercase text-gray-400">
+        Pembanding — AASHTO HL-93 per Lajur (PCI BDM §8.11, rumus tertutup simple span)
+      </p>
+      <div className="grid grid-cols-4 gap-1.5 max-w-md">
+        <Nf label="x/L posisi momen" value={inp.xRatio} onChange={v => set("xRatio", v)} step={0.05} />
+        <Nf label="g_M faktor distribusi" value={inp.gM} onChange={v => set("gM", v)} step={0.05} />
+        <Nf label="g_V faktor distribusi" value={inp.gV} onChange={v => set("gV", v)} step={0.05} />
+        <Nf label="IM truk/tandem" value={inp.IM} onChange={v => set("IM", v)} step={0.03} />
+      </div>
+      <div className="flex gap-4">
+        <table className="flex-1"><tbody>
+          <Row label="M truk HS20 (3 gandar 35+145+145 kN)" value={f(r.M_truck, 0)} unit="kN·m/lajur" />
+          <Row label="M tandem (2×110 kN @1,2 m)" value={f(r.M_tandem, 0)} unit="kN·m/lajur" />
+          <Row label="M lajur 9,3 kN/m" value={f(r.M_lane, 0)} unit="kN·m/lajur" />
+          <Row label={`M HL-93 = ${r.governsVehicle === "TANDEM" ? "tandem" : "truk"}·(1+IM) + lajur`} value={f(r.M_HL93_lane, 0)} unit="kN·m/lajur" hi />
+          <Row label="M fatik (gandar 145 @9,1 m, IM 15%)" value={f(r.M_fatigue, 0)} unit="kN·m/lajur" />
+        </tbody></table>
+        <table className="flex-1"><tbody>
+          <Row label="V truk di tumpuan" value={f(r.V_truck, 0)} unit="kN/lajur" />
+          <Row label="V tandem" value={f(r.V_tandem, 0)} unit="kN/lajur" />
+          <Row label="V lajur" value={f(r.V_lane, 0)} unit="kN/lajur" />
+          <Row label="V HL-93 per lajur" value={f(r.V_HL93_lane, 0)} unit="kN" hi />
+          <Row label="M per gelagar (× g_M)" value={f(r.M_HL93_girder, 0)} unit="kN·m" hi />
+          <Row label="V per gelagar (× g_V)" value={f(r.V_HL93_girder, 0)} unit="kN" hi />
+        </tbody></table>
+      </div>
+      <div className="bg-green-50 border border-green-200 rounded px-2 py-1.5 text-[10px] flex justify-between items-center">
+        <span className="text-green-800">w<sub>Live</sub> ekivalen HL-93 per gelagar (ambil g dari tab 🛤 LLDF):</span>
+        <span className="font-mono font-bold text-green-700">{f(r.wLive_equiv, 2)} kN/m</span>
       </div>
     </div>
   );

@@ -89,6 +89,85 @@ export interface HandlingResult {
   readonly multiplierSet: string;   // which PCI set applied
 }
 
+// ════════════════════════════════════════════════════════════════
+// Improved Multiplier Method — PCI Bridge Design Manual §8.7.2
+// (Tadros, Ghali & Meyer 1985)
+//
+// Refines the classic PCI multipliers in two ways: (1) the ACTUAL creep
+// coefficients of the mix may be substituted (HPC creeps less), and
+// (2) the camber LOSS component uses the actual computed time-dependent
+// prestress loss as an apparent negative prestressing force.
+//
+//   Multipliers (Table 8.7.2-1):              erection      final
+//     initial prestress δ_p                   1 + C_a       1 + C_u
+//     prestress loss   δ_loss = (ΔP_td/P_o)·δ_p
+//                                            α(1 + χ·C_a)   1 + χ·C_u
+//     self weight      δ_w                    1 + C_a       1 + C_u
+//     dead load on plain beam                 1.0           1 + C'_u
+//     dead load on composite beam             1.0           1 + C'_u
+//   Defaults (RH 70%, release 1–3 d, erection 40–60 d):
+//     C_u = 1.88 · C'_u = 1.50 · C_a = 0.96 · α = 0.60 · χ = 0.70
+// ════════════════════════════════════════════════════════════════
+
+export interface ImprovedMultiplierInputs {
+  /** Instantaneous camber from prestress at release (mm, up +) */
+  camberPi: number;
+  /** Instantaneous self-weight deflection (mm, down +) */
+  deflWi: number;
+  /** Deflection from DL applied to the PLAIN beam (mm, down +) */
+  deflDLplain: number;
+  /** Deflection from DL applied to the COMPOSITE beam (mm, down +) */
+  deflDLcomp: number;
+  /** Time-dependent prestress-loss ratio ΔP_td/P_o (exclude ES & pre-release
+   *  relaxation) — apparent negative prestress */
+  lossRatio: number;
+  /** Ultimate creep coefficient, load at transfer C_u */
+  Cu: number;
+  /** Ultimate creep coefficient, load at erection C'_u */
+  CuErec: number;
+  /** Creep at erection for transfer loads C_a */
+  Ca: number;
+  /** Fraction of time-dependent loss occurring by erection α */
+  alphaLoss: number;
+  /** Bažant aging coefficient χ */
+  chi: number;
+}
+
+export interface ImprovedMultiplierResult {
+  readonly deflLoss: number;          // camber loss component (mm, down +)
+  readonly mPe: number; readonly mLe: number; readonly mWe: number; // erection multipliers
+  readonly mPf: number; readonly mLf: number; readonly mWf: number; readonly mDf: number; // final
+  readonly camberErection: number;    // mm, up +
+  readonly camberFinal: number;       // mm, up +
+}
+
+export function computeImprovedMultipliers(inp: ImprovedMultiplierInputs): ImprovedMultiplierResult {
+  const { camberPi, deflWi, deflDLplain, deflDLcomp, lossRatio, Cu, CuErec, Ca, alphaLoss, chi } = inp;
+
+  const deflLoss = lossRatio * camberPi;        // apparent negative prestress
+
+  const mPe = 1 + Ca;
+  const mLe = alphaLoss * (1 + chi * Ca);
+  const mWe = 1 + Ca;
+
+  const mPf = 1 + Cu;
+  const mLf = 1 + chi * Cu;
+  const mWf = 1 + Cu;
+  const mDf = 1 + CuErec;
+
+  const camberErection =
+    mPe * camberPi - mLe * deflLoss - mWe * deflWi - 1.0 * deflDLplain;
+  const camberFinal =
+    mPf * camberPi - mLf * deflLoss - mWf * deflWi - mDf * deflDLplain - mDf * deflDLcomp;
+
+  return Object.freeze({
+    deflLoss,
+    mPe, mLe, mWe,
+    mPf, mLf, mWf, mDf,
+    camberErection, camberFinal,
+  });
+}
+
 export function computeHandling(inp: HandlingInputs): HandlingResult {
   const {
     L, w, A, Ztop, Zbot, fci, Pi, e, liftRatio,

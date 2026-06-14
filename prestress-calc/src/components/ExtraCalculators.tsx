@@ -27,8 +27,12 @@ import { RatingCalculator } from "@/components/RatingCalculator";
 import { SplicedGirderCalculator } from "@/components/SplicedGirderCalculator";
 import { FatigueCalculator } from "@/components/FatigueCalculator";
 import { OptimizationCalculator } from "@/components/OptimizationCalculator";
+import { TransversePTCalculator } from "@/components/TransversePTCalculator";
+import { StrutTieCalculator } from "@/components/StrutTieCalculator";
+import { DeckSlabCalculator } from "@/components/DeckSlabCalculator";
+import { SeismicCalculator } from "@/components/SeismicCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic";
 
 interface Props {
   open: boolean;
@@ -187,6 +191,30 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Biaya per m² dek — CMCR = 0.936+(f'c/100)³, jumlah vs jarak gelagar, angkut+ereksi (Hassanain–Loov PCI J. 1999)",
   },
   {
+    key: "deck",
+    emoji: "🛞",
+    title: "Desain Pelat Dek Jembatan",
+    subtitle: "Metode strip AASHTO Standard vs LRFD — lebar ekuivalen, momen ±, overhang, impak (PCI BDM §8.8)",
+  },
+  {
+    key: "transpt",
+    emoji: "🔲",
+    title: "Desain Transversal Box Adjacent",
+    subtitle: "PT diafragma transversal + tie-rod Oregon untuk balok box berdampingan — gaya PT vs lebar/tinggi (PCI BDM §8.9, El-Remaily)",
+  },
+  {
+    key: "stm",
+    emoji: "▽",
+    title: "Strut-and-Tie (D-Region)",
+    subtitle: "Model strut-tie zona-D & kepala-pilar — f_cu softening, faktor node CCC/CCT/CTT, φ strut/tie (PCI BDM §8.12, AASHTO §5.6.3)",
+  },
+  {
+    key: "seismic",
+    emoji: "🌐",
+    title: "Beban Gempa (Mode Tunggal)",
+    subtitle: "Metode beban seragam single-mode — T, C_s, V desain, lebar dudukan min N (PCI BDM Ch.15, STD I-A / LRFD §4.7.4)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
@@ -267,7 +295,11 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "aemm" && "Gilbert, Mickleborough & Ranzi 'Design of Prestressed Concrete to Eurocode 2' §5.7 / §5.11.4 — Age-Adjusted Effective Modulus Method (Trost–Bažant), restraint creep+susut+relaksasi, penampang transformasi age-adjusted"}
           {tab === "special" && "N. Krishna Raju 'Prestressed Concrete' Bab 16 & 19 — pipa prategang melingkar (wire winding), tiang/pole prategang, bantalan rel (rail-seat & centre moment)"}
           {tab === "opt" && "Hassanain & Loov, 'Design of Prestressed Girder Bridges Using HPC — An Optimization Approach' (PCI Journal 1999) — C = [n_g·C_g + C_c·V_c + C_s·m_s]/(W·L), CMCR mix-cost ratio, jarak gelagar 3–6 m, n_g ≥ 2"}
-          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · properti penampang terurut dimensi"}
+          {tab === "deck" && "PCI Bridge Design Manual §8.8 — Bridge Deck Design · Metode strip AASHTO Standard (S+2)/32 vs LRFD lebar ekuivalen (660+0.55S), momen positif/negatif/overhang, impak 30%/IM 1.33"}
+          {tab === "transpt" && "PCI Bridge Design Manual §8.9 (El-Remaily, Tadros) — Transverse Design of Adjacent Box Beams · PT diafragma transversal (grout no-tension + 1.72 MPa) atau tie-rod empiris Oregon Ø22 A449"}
+          {tab === "stm" && "PCI Bridge Design Manual §8.12 + AASHTO LRFD §5.6.3 — Strut-and-Tie Model · f_cu = f'c/(0.8+170ε₁) ≤ 0.85f'c, faktor node CCC 0.85 / CCT 0.75 / CTT 0.65, φ_strut 0.70 / φ_tie 0.90, rangka kepala-pilar"}
+          {tab === "seismic" && "PCI Bridge Design Manual Ch.15 — Seismic Design · Metode beban seragam mode-tunggal (STD Div. I-A / LRFD §4.7.4): T=2π√(W/gK), C_s=1.2AS/T^⅔≤2.5A, V/R, lebar dudukan min N anti loss-of-span"}
+          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · AASHTO Box BI–BIV · properti penampang terurut dimensi"}
         </div>
 
         {/* Content */}
@@ -297,6 +329,10 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "aemm"    && <AEMMCalculator />}
           {tab === "special" && <SpecialMembersCalculator />}
           {tab === "opt"     && <OptimizationCalculator />}
+          {tab === "deck"    && <DeckSlabCalculator />}
+          {tab === "transpt" && <TransversePTCalculator />}
+          {tab === "stm"     && <StrutTieCalculator />}
+          {tab === "seismic" && <SeismicCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

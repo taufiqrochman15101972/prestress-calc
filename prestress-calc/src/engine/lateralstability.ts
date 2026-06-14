@@ -106,6 +106,191 @@ function rectJ(b: number, h: number): number {
   return (long * t ** 3) / 3;
 }
 
+// ════════════════════════════════════════════════════════════════
+// Mast roll-equilibrium method — PCI Bridge Design Manual §8.10
+// (Mast 1989/1993; Imper & Laszlo 1987)
+//
+// Different physics from the Timoshenko buckling check above: a beam
+// hanging from lifting loops (roll axis ABOVE the c.g.) or sitting on
+// flexible supports / truck (roll axis BELOW the c.g.) tilts as a rigid
+// body plus lateral bending; safety is the ratio of resisting to applied
+// roll moment.
+//
+//  z̄_o  = w/(12·E·I_y·l)·[0.1·l₁⁵ − a²·l₁³ + 3a⁴·l₁ + 1.2a⁵]   (Eq. 8.10.1.1-1)
+//        (a = 0 → z̄_o = w·l⁴/(120·E·I_y))                       (Eq. 8.10.1.1-2)
+//  M_lat = (f_r + f_top)·I_y/(b/2) ;  θ_max = M_lat/M_g
+//  HANGING:   θ_i = e_i/y_r ;  FS_c = 1/(z̄_o/y_r + θ_i/θ_max)   (Eq. 8.10.1.1-3)
+//             FS_f ≈ FS_c ≥ 1.5
+//  HAULING:   r = K_θ/W ;  θ̄ = (α·r + e_i)/(r − y − z̄_o)        (Eq. 8.10.1.2-1)
+//             FS_c = r(θ_max − α)/(z̄_o·θ_max + e_i + y·θ_max) ≥ 1.0
+//             θ'_max = (z_max − h_r·α)/r + α                     (Eq. 8.10.1.2-4)
+//             z̄'_o = z̄_o(1 + 2.5·θ'_max)  (I_eff = I_g/(1+2.5θ)) (Eq. 8.10.1.2-6)
+//             FS_f = r(θ'_max − α)/(z̄'_o·θ'_max + e_i + y·θ'_max) ≥ 1.5
+//
+// e_i (initial lateral eccentricity): sweep × offset-factor + placement
+// tolerance, offset factor = (l₁/l)² − 1/3 (parabolic arc).
+// Internal SI: N, mm, MPa. f_r follows the project code (0.62√f'c).
+// ════════════════════════════════════════════════════════════════
+
+/** Offset factor of a parabolic sweep arc between support/lift points. */
+export function sweepOffsetFactor(L: number, a: number): number {
+  const L1 = L - 2 * a;
+  return (L1 / L) ** 2 - 1 / 3;
+}
+
+/** Lateral deflection of the c.g. with full weight applied laterally (mm).
+ *  w N/mm, E MPa, Iy mm⁴, lengths mm. */
+export function lateralZo(w: number, E: number, Iy: number, L: number, a: number): number {
+  const L1 = L - 2 * a;
+  return (w / (12 * E * Iy * L)) *
+    (0.1 * L1 ** 5 - a ** 2 * L1 ** 3 + 3 * a ** 4 * L1 + 1.2 * a ** 5);
+}
+
+/** Tilt angle at cracking: M_lat capacity / self-weight moment at the
+ *  critical (harp-point) section. fr, fTopComp MPa (+), Iy mm⁴, bTop mm,
+ *  Mg N·mm. */
+export function tiltAtCracking(fr: number, fTopComp: number, Iy: number, bTop: number, Mg: number): { Mlat: number; thetaMax: number } {
+  const Mlat = ((fr + fTopComp) * Iy) / (bTop / 2); // N·mm
+  return { Mlat, thetaMax: Mg > 0 ? Mlat / Mg : Infinity };
+}
+
+export interface MastHangingInputs {
+  /** Overall length (m) */
+  L: number;
+  /** Overhang from end to lift point (m) */
+  a: number;
+  /** Self weight (kN/m) */
+  w: number;
+  /** E_ci at lifting (MPa) */
+  Ec: number;
+  /** Weak-axis I_y (mm⁴) */
+  Iy: number;
+  /** Height of roll axis (lift point) above c.g. of the CAMBERED arc (mm) */
+  yr: number;
+  /** Sweep (total lateral bow) of the member (mm) — e_i uses ½·sweep·offset + tol */
+  sweep: number;
+  /** Lifting-loop placement tolerance (mm), PCI ≈ 6 mm */
+  placementTol: number;
+  /** Modulus of rupture f_r (MPa) */
+  fr: number;
+  /** Compressive stress at the top fibre at the harp point (MPa, enter +) */
+  fTopComp: number;
+  /** Self-weight moment at the harp point (kN·m) */
+  Mg: number;
+  /** Top-flange width b (mm) */
+  bTop: number;
+}
+
+export interface MastHangingResult {
+  readonly L1: number;          // span between lift points (m)
+  readonly offsetFactor: number;
+  readonly ei: number;          // initial lateral eccentricity (mm)
+  readonly zo: number;          // lateral deflection of c.g. (mm)
+  readonly thetaI: number;      // initial roll angle e_i/y_r (rad)
+  readonly Mlat: number;        // lateral cracking moment (kN·m)
+  readonly thetaMax: number;    // tilt at cracking (rad)
+  readonly FSc: number;         // factor of safety vs cracking (= FS_f)
+  readonly FSrequired: number;  // 1.5
+  readonly ok: boolean;
+}
+
+export function computeMastHanging(inp: MastHangingInputs): MastHangingResult {
+  const L = inp.L * 1000, a = inp.a * 1000;          // mm
+  const w = inp.w;                                    // kN/m = N/mm
+  const L1 = L - 2 * a;
+  const offsetFactor = sweepOffsetFactor(L, a);
+  const ei = 0.5 * inp.sweep * offsetFactor + inp.placementTol;
+  const zo = lateralZo(w, inp.Ec, inp.Iy, L, a);
+  const thetaI = inp.yr > 0 ? ei / inp.yr : Infinity;
+  const { Mlat, thetaMax } = tiltAtCracking(inp.fr, inp.fTopComp, inp.Iy, inp.bTop, inp.Mg * 1e6);
+  const FSc = 1 / (zo / inp.yr + thetaI / thetaMax);
+  const FSrequired = 1.5;
+  return Object.freeze({
+    L1: L1 / 1000, offsetFactor, ei, zo, thetaI,
+    Mlat: Mlat / 1e6, thetaMax,
+    FSc, FSrequired, ok: FSc >= FSrequired,
+  });
+}
+
+export interface MastHaulingInputs {
+  /** Overall length (m) */
+  L: number;
+  /** Overhang from end to truck support (m) */
+  a: number;
+  /** Self weight (kN/m) */
+  w: number;
+  /** E_c at hauling (MPa) */
+  Ec: number;
+  /** Weak-axis I_y (mm⁴) */
+  Iy: number;
+  /** Roll stiffness of the hauling rig K_θ (kN·m/rad) */
+  Ktheta: number;
+  /** Height of beam c.g. above the roadway (mm) */
+  hcg: number;
+  /** Height of the roll centre above the roadway (mm) */
+  hr: number;
+  /** Superelevation / cross slope α (rad) */
+  alpha: number;
+  /** Sweep for shipping (mm) — creep-increased, PCI: full tolerance */
+  sweep: number;
+  /** Off-centre placement on the truck (mm), PCI ≈ 25 mm */
+  placementTol: number;
+  /** Transverse distance CL-beam → centre of dual tyres z_max (mm) */
+  zmax: number;
+  /** Modulus of rupture f_r (MPa) */
+  fr: number;
+  /** Compressive top-fibre stress at harp point during hauling (MPa, +) */
+  fTopComp: number;
+  /** Self-weight moment at harp point (kN·m) */
+  Mg: number;
+  /** Top-flange width b (mm) */
+  bTop: number;
+}
+
+export interface MastHaulingResult {
+  readonly W: number;          // total weight (kN)
+  readonly r: number;          // radius of stability K_θ/W (mm)
+  readonly y: number;          // c.g. above roll axis, +2% camber allowance (mm)
+  readonly ei: number;         // initial eccentricity for shipping (mm)
+  readonly zo: number;         // lateral deflection (mm)
+  readonly thetaEq: number;    // equilibrium tilt angle (rad)
+  readonly Mlat: number;       // lateral moment at θ_eq (kN·m) — add to f_b!
+  readonly thetaMax: number;   // tilt at cracking (rad)
+  readonly FSc: number;        // FS vs cracking ≥ 1.0
+  readonly thetaPrimeMax: number; // tilt at max resisting arm (rad)
+  readonly zoPrime: number;    // cracked-section z̄'_o (mm)
+  readonly FSf: number;        // FS vs rollover ≥ 1.5
+  readonly FScReq: number;     // 1.0
+  readonly FSfReq: number;     // 1.5
+  readonly okCrack: boolean;
+  readonly okRollover: boolean;
+}
+
+export function computeMastHauling(inp: MastHaulingInputs): MastHaulingResult {
+  const L = inp.L * 1000, a = inp.a * 1000;
+  const w = inp.w;                                  // N/mm
+  const W = inp.w * inp.L;                          // kN
+  const r = (inp.Ktheta / W) * 1000;                // m → mm
+  const y = (inp.hcg - inp.hr) * 1.02;              // +2% camber allowance (PCI)
+  const offsetFactor = sweepOffsetFactor(L, a);
+  const ei = inp.sweep * offsetFactor + inp.placementTol;
+  const zo = lateralZo(w, inp.Ec, inp.Iy, L, a);
+  const thetaEq = (inp.alpha * r + ei) / (r - y - zo);
+  const { Mlat: MlatCap, thetaMax } = tiltAtCracking(inp.fr, inp.fTopComp, inp.Iy, inp.bTop, inp.Mg * 1e6);
+  const Mlat = thetaEq * inp.Mg;                    // kN·m acting at θ_eq
+  const FSc = (r * (thetaMax - inp.alpha)) / (zo * thetaMax + ei + y * thetaMax);
+  const thetaPrimeMax = (inp.zmax - inp.hr * inp.alpha) / r + inp.alpha;
+  const zoPrime = zo * (1 + 2.5 * thetaPrimeMax);
+  const FSf = (r * (thetaPrimeMax - inp.alpha)) / (zoPrime * thetaPrimeMax + ei + y * thetaPrimeMax);
+  void MlatCap;
+  return Object.freeze({
+    W, r, y, ei, zo, thetaEq, Mlat, thetaMax,
+    FSc, thetaPrimeMax, zoPrime, FSf,
+    FScReq: 1.0, FSfReq: 1.5,
+    okCrack: FSc >= 1.0, okRollover: FSf >= 1.5,
+  });
+}
+
 export function computeLateralStability(inp: LateralStabilityInputs): LateralStabilityResult {
   const { b1, h1, b2, h2, b3, h3, L, fc, nu, phiCreep, loadCase, Wapplied, loadHeight } = inp;
 

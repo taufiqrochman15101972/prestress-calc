@@ -13,7 +13,8 @@ import type { IGirderGeometry } from "@/types";
 export type PresetCategory =
   | "CUSTOM" | "WIKA_WF" | "AASHTO_I" | "PCI_BT" | "PCI_I"
   | "NU" | "CPCI"
-  | "DECK_BULB_T" | "DOUBLE_T" | "PC_U" | "VOIDED_SLAB" | "BOX";
+  | "DECK_BULB_T" | "DOUBLE_T" | "PC_U" | "VOIDED_SLAB" | "BOX"
+  | "AASHTO_BOX";
 
 export interface GirderPreset {
   id: string;
@@ -36,6 +37,7 @@ export const CATEGORY_LABEL: Record<PresetCategory, string> = {
   PC_U: "PC-U Girder (trough)",
   VOIDED_SLAB: "Voided Slab",
   BOX: "Box / Spread-Box Beam",
+  AASHTO_BOX: "AASHTO Box Beam BI–BIV (ekuivalen-I)",
 };
 
 export const GIRDER_PRESETS: GirderPreset[] = [
@@ -160,6 +162,27 @@ export const GIRDER_PRESETS: GirderPreset[] = [
     girder: { b1: 1200, h1: 175, h5: 0, b2: 900, h2: 650, h4: 0, b3: 1200, h3: 175 } },
   { id: "box_1400", name: "Spread-Box 1400", category: "BOX", spanRange: "26–38 m",
     girder: { b1: 1300, h1: 200, h5: 0, b2: 1000, h2: 1000, h4: 0, b3: 1300, h3: 200 } },
+
+  // ── AASHTO Box Beams BI–BIV (PCI BDM App. B) — adjacent/spread box,
+  //    walls 2×127 → web 254; flange thickness CALIBRATED (104/103 mm)
+  //    so the equivalent-I area matches the published 560.5–842.5 in²;
+  //    fillets 76 mm (3 in). True closed-box J/torsion → 🌉 Box Girder tab. ──
+  { id: "abox_bi36", name: "AASHTO BI-36", category: "AASHTO_BOX", spanRange: "≤ 28 m",
+    girder: { b1: 914, h1: 104, h5: 76, b2: 254, h2: 326, h4: 76, b3: 914, h3: 104 } },
+  { id: "abox_bi48", name: "AASHTO BI-48", category: "AASHTO_BOX", spanRange: "≤ 28 m",
+    girder: { b1: 1219, h1: 103, h5: 76, b2: 254, h2: 328, h4: 76, b3: 1219, h3: 103 } },
+  { id: "abox_bii36", name: "AASHTO BII-36", category: "AASHTO_BOX", spanRange: "≤ 33 m",
+    girder: { b1: 914, h1: 104, h5: 76, b2: 254, h2: 478, h4: 76, b3: 914, h3: 104 } },
+  { id: "abox_bii48", name: "AASHTO BII-48", category: "AASHTO_BOX", spanRange: "≤ 33 m",
+    girder: { b1: 1219, h1: 103, h5: 76, b2: 254, h2: 480, h4: 76, b3: 1219, h3: 103 } },
+  { id: "abox_biii36", name: "AASHTO BIII-36", category: "AASHTO_BOX", spanRange: "≤ 37 m",
+    girder: { b1: 914, h1: 104, h5: 76, b2: 254, h2: 631, h4: 76, b3: 914, h3: 104 } },
+  { id: "abox_biii48", name: "AASHTO BIII-48", category: "AASHTO_BOX", spanRange: "≤ 38 m",
+    girder: { b1: 1219, h1: 103, h5: 76, b2: 254, h2: 633, h4: 76, b3: 1219, h3: 103 } },
+  { id: "abox_biv36", name: "AASHTO BIV-36", category: "AASHTO_BOX", spanRange: "≤ 38 m",
+    girder: { b1: 914, h1: 104, h5: 76, b2: 254, h2: 707, h4: 76, b3: 914, h3: 104 } },
+  { id: "abox_biv48", name: "AASHTO BIV-48", category: "AASHTO_BOX", spanRange: "≤ 39 m",
+    girder: { b1: 1219, h1: 103, h5: 76, b2: 254, h2: 709, h4: 76, b3: 1219, h3: 103 } },
 ];
 
 export function findPreset(id: string): GirderPreset | undefined {

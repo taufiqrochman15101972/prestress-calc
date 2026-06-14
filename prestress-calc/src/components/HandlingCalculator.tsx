@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computeHandling } from "@/engine/handling";
-import type { HandlingInputs } from "@/engine/handling";
+import { computeHandling, computeImprovedMultipliers } from "@/engine/handling";
+import type { HandlingInputs, ImprovedMultiplierInputs } from "@/engine/handling";
 import { checkDebondLimits } from "@/engine/development";
 
 const DEFAULT: HandlingInputs = {
@@ -152,6 +152,59 @@ export function HandlingCalculator() {
           value={`σ ∈ [${f(res.limComp, 1)}, ${f(res.limTens, 1)}] MPa`} ok={res.handlingOk} />
 
         <DebondBlock />
+
+        <ImprovedMultiplierBlock camberPi={inp.camberPi} deflWi={inp.deflWi} />
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Improved (refined) multiplier method — Tadros, Ghali & Meyer 1985
+// PCI BDM §8.7.2. Splits each load case so that the prestress-loss
+// component (apparent −prestress) and the composite/erection DL get
+// their OWN time-dependent multipliers instead of the lumped PCI 2.45.
+// ════════════════════════════════════════════════════════════════
+function ImprovedMultiplierBlock({ camberPi, deflWi }: { camberPi: number; deflWi: number }) {
+  const [inp, setInp] = useState<Omit<ImprovedMultiplierInputs, "camberPi" | "deflWi">>({
+    deflDLplain: 6, deflDLcomp: 9, lossRatio: 0.18,
+    Cu: 1.88, CuErec: 1.5, Ca: 0.96, alphaLoss: 0.6, chi: 0.7,
+  });
+  const set = (k: keyof typeof inp, v: number) => setInp(p => ({ ...p, [k]: v }));
+  const r = useMemo(
+    () => computeImprovedMultipliers({ camberPi, deflWi, ...inp }),
+    [camberPi, deflWi, inp]);
+  const f = (v: number, d = 2) => v.toFixed(d);
+
+  return (
+    <div className="border-t border-gray-200 pt-2">
+      <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">
+        Metode Multiplier Diperbaiki (Tadros 1985 — PCI BDM §8.7.2)
+      </p>
+      <div className="flex gap-3 items-start">
+        <div className="w-48 flex-none grid grid-cols-2 gap-1.5">
+          <Nf label="lendut DL pd. balok polos ↓" unit="mm" value={inp.deflDLplain} onChange={v => set("deflDLplain", v)} step={1} />
+          <Nf label="lendut DL pd. komposit ↓" unit="mm" value={inp.deflDLcomp} onChange={v => set("deflDLcomp", v)} step={1} />
+          <Nf label="rasio rugi td. ΔP/Po" value={inp.lossRatio} onChange={v => set("lossRatio", v)} step={0.01} />
+          <Nf label="C_u (transfer)" value={inp.Cu} onChange={v => set("Cu", v)} step={0.05} />
+          <Nf label="C'_u (ereksi)" value={inp.CuErec} onChange={v => set("CuErec", v)} step={0.05} />
+          <Nf label="C_a (saat ereksi)" value={inp.Ca} onChange={v => set("Ca", v)} step={0.05} />
+          <Nf label="α (rugi @ereksi)" value={inp.alphaLoss} onChange={v => set("alphaLoss", v)} step={0.05} />
+          <Nf label="χ (aging Bažant)" value={inp.chi} onChange={v => set("chi", v)} step={0.05} />
+        </div>
+        <div className="flex-1">
+          <table className="w-full"><tbody>
+            <Row label="rugi-camber ekiv (−prategang)" value={f(r.deflLoss, 1)} unit="mm ↓" />
+            <Row label="Erection: m_Pe / m_Le / m_We" value={`${f(r.mPe)} / ${f(r.mLe)} / ${f(r.mWe)}`} />
+            <Row label="Final: m_Pf / m_Lf / m_Wf / m_Df" value={`${f(r.mPf)} / ${f(r.mLf)} / ${f(r.mWf)} / ${f(r.mDf)}`} />
+            <Row label="Camber saat ereksi" value={`${f(Math.abs(r.camberErection), 1)} ${r.camberErection >= 0 ? "↑" : "↓"}`} unit="mm" hi />
+            <Row label="Camber/lendut final" value={`${f(Math.abs(r.camberFinal), 1)} ${r.camberFinal >= 0 ? "↑" : "↓"}`} unit="mm" hi />
+          </tbody></table>
+          <p className="text-[9px] text-gray-400 mt-1 leading-snug">
+            Tiap beban memakai pengali waktu sendiri (rugi prategang vs DL komposit), bukan
+            pengali tunggal 2.45 — lebih akurat untuk gelagar komposit & ereksi tertunda.
+          </p>
+        </div>
       </div>
     </div>
   );

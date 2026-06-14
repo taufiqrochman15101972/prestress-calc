@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computeLateralStability, K_FACTORS } from "@/engine/lateralstability";
-import type { LateralStabilityInputs, SupportLoadCase, LoadHeight } from "@/engine/lateralstability";
+import { computeLateralStability, computeMastHanging, computeMastHauling, K_FACTORS } from "@/engine/lateralstability";
+import type { LateralStabilityInputs, SupportLoadCase, LoadHeight, MastHangingInputs, MastHaulingInputs } from "@/engine/lateralstability";
 
 const DEFAULT: LateralStabilityInputs = {
   b1: 500, h1: 150, b2: 160, h2: 1500, b3: 650, h3: 200,
@@ -161,7 +161,98 @@ export function LateralStabilityCalculator() {
             (saat angkat/transport/ereksi). Sediakan penopang lateral atau pengaku bila FS &lt; 3.
           </div>
         )}
+
+        <MastBlock Iy={res.Iy} />
       </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Mast roll-equilibrium method — PCI BDM §8.10 (Mast 1989/1993)
+// Hanging from loops (roll axis ABOVE c.g.) + on truck (roll axis BELOW)
+// ════════════════════════════════════════════════════════════════
+function MastBlock({ Iy }: { Iy: number }) {
+  const [hang, setHang] = useState<MastHangingInputs>({
+    L: 41.5, a: 2.7, w: 12.0, Ec: 33700, Iy,
+    yr: 870, sweep: 43, placementTol: 6,
+    fr: 3.74, fTopComp: 0.8, Mg: 1800, bTop: 1070,
+  });
+  const [haul, setHaul] = useState<MastHaulingInputs>({
+    L: 41.5, a: 2.7, w: 12.0, Ec: 34500, Iy,
+    Ktheta: 4580, hcg: 2740, hr: 610, alpha: 0.06,
+    sweep: 86, placementTol: 25, zmax: 915,
+    fr: 3.95, fTopComp: 2.3, Mg: 1800, bTop: 1070,
+  });
+  const setH = (k: keyof MastHangingInputs, v: number) => setHang(p => ({ ...p, [k]: v }));
+  const setT = (k: keyof MastHaulingInputs, v: number) => setHaul(p => ({ ...p, [k]: v }));
+  const rh = useMemo(() => computeMastHanging({ ...hang, Iy }), [hang, Iy]);
+  const rt = useMemo(() => computeMastHauling({ ...haul, Iy }), [haul, Iy]);
+  const f = (v: number, d = 2) => v.toFixed(d);
+
+  return (
+    <div className="border-t border-gray-200 pt-2 space-y-2">
+      <p className="text-[9px] font-bold uppercase text-gray-400">
+        Metode Mast (PCI BDM §8.10) — Keseimbangan Guling Angkat & Hauling
+      </p>
+
+      {/* hanging */}
+      <p className="text-[9px] font-semibold text-gray-500">A · Balok Tergantung Lifting Loop (sumbu guling DI ATAS c.g.)</p>
+      <div className="grid grid-cols-6 gap-1.5">
+        <Nf label="L total" unit="m" value={hang.L} onChange={v => setH("L", v)} step={0.5} />
+        <Nf label="a overhang" unit="m" value={hang.a} onChange={v => setH("a", v)} step={0.1} />
+        <Nf label="w berat" unit="kN/m" value={hang.w} onChange={v => setH("w", v)} step={0.5} />
+        <Nf label="E_ci" unit="MPa" value={hang.Ec} onChange={v => setH("Ec", v)} step={500} />
+        <Nf label="y_r poros–c.g." unit="mm" value={hang.yr} onChange={v => setH("yr", v)} step={10} />
+        <Nf label="sweep total" unit="mm" value={hang.sweep} onChange={v => setH("sweep", v)} step={2} />
+        <Nf label="tol. loop" unit="mm" value={hang.placementTol} onChange={v => setH("placementTol", v)} step={1} />
+        <Nf label="f_r" unit="MPa" value={hang.fr} onChange={v => setH("fr", v)} step={0.1} />
+        <Nf label="f_top tekan" unit="MPa" value={hang.fTopComp} onChange={v => setH("fTopComp", v)} step={0.1} />
+        <Nf label="M_g harp" unit="kN·m" value={hang.Mg} onChange={v => setH("Mg", v)} step={50} />
+        <Nf label="b flens atas" unit="mm" value={hang.bTop} onChange={v => setH("bTop", v)} step={10} />
+      </div>
+      <table className="w-full max-w-lg"><tbody>
+        <Row label="e_i = ½sweep·[(l₁/l)²−⅓] + tol" value={f(rh.ei, 1)} unit="mm" />
+        <Row label="z̄_o lendut lateral c.g. (Eq. 8.10.1.1-1)" value={f(rh.zo, 1)} unit="mm" hi />
+        <Row label="θ_i = e_i/y_r" value={f(rh.thetaI, 4)} unit="rad" />
+        <Row label="M_lat = (f_r+f_top)·I_y/(b/2)" value={f(rh.Mlat, 0)} unit="kN·m" />
+        <Row label="θ_max = M_lat/M_g" value={f(rh.thetaMax, 4)} unit="rad" />
+      </tbody></table>
+      <Chk label="FS_c = 1/(z̄_o/y_r + θ_i/θ_max) ≥ 1,5 (= FS_f)"
+        value={`${f(rh.FSc, 2)} ${rh.ok ? "≥" : "<"} 1,5`} ok={rh.ok} />
+
+      {/* hauling */}
+      <p className="text-[9px] font-semibold text-gray-500 pt-1">B · Balok di Atas Truk/Perletakan Fleksibel (sumbu guling DI BAWAH c.g.)</p>
+      <div className="grid grid-cols-6 gap-1.5">
+        <Nf label="K_θ rig" unit="kN·m/rad" value={haul.Ktheta} onChange={v => setT("Ktheta", v)} step={100} />
+        <Nf label="h_cg" unit="mm" value={haul.hcg} onChange={v => setT("hcg", v)} step={25} />
+        <Nf label="h_r poros" unit="mm" value={haul.hr} onChange={v => setT("hr", v)} step={25} />
+        <Nf label="α superelevasi" unit="rad" value={haul.alpha} onChange={v => setT("alpha", v)} step={0.01} />
+        <Nf label="z_max roda" unit="mm" value={haul.zmax} onChange={v => setT("zmax", v)} step={25} />
+        <Nf label="sweep kirim" unit="mm" value={haul.sweep} onChange={v => setT("sweep", v)} step={2} />
+        <Nf label="tol. posisi" unit="mm" value={haul.placementTol} onChange={v => setT("placementTol", v)} step={5} />
+        <Nf label="E_c" unit="MPa" value={haul.Ec} onChange={v => setT("Ec", v)} step={500} />
+        <Nf label="f_r" unit="MPa" value={haul.fr} onChange={v => setT("fr", v)} step={0.1} />
+        <Nf label="f_top tekan" unit="MPa" value={haul.fTopComp} onChange={v => setT("fTopComp", v)} step={0.1} />
+        <Nf label="M_g harp" unit="kN·m" value={haul.Mg} onChange={v => setT("Mg", v)} step={50} />
+      </div>
+      <table className="w-full max-w-lg"><tbody>
+        <Row label="r = K_θ/W (radius stabilitas)" value={f(rt.r, 0)} unit="mm" hi />
+        <Row label="y = (h_cg − h_r)·1,02" value={f(rt.y, 0)} unit="mm" />
+        <Row label="θ̄ ekuilibrium = (αr+e_i)/(r−y−z̄_o)" value={f(rt.thetaEq, 4)} unit="rad" />
+        <Row label="M_lat = θ̄·M_g (tambahkan ke f_b!)" value={f(rt.Mlat, 0)} unit="kN·m" hi />
+        <Row label="θ'_max = (z_max − h_r·α)/r + α" value={f(rt.thetaPrimeMax, 4)} unit="rad" />
+        <Row label="z̄'_o retak = z̄_o(1 + 2,5·θ'_max)" value={f(rt.zoPrime, 1)} unit="mm" />
+      </tbody></table>
+      <Chk label="FS_c retak = r(θ_max−α)/(z̄_o·θ_max+e_i+y·θ_max) ≥ 1,0"
+        value={`${f(rt.FSc, 2)} ${rt.okCrack ? "≥" : "<"} 1,0`} ok={rt.okCrack} />
+      <Chk label="FS_f rollover (pakai z̄'_o, θ'_max) ≥ 1,5"
+        value={`${f(rt.FSf, 2)} ${rt.okRollover ? "≥" : "<"} 1,5`} ok={rt.okRollover} />
+      <p className="text-[9px] text-gray-400 leading-snug">
+        Fisika berbeda dari tekuk Timoshenko di atas: balok menggulung sebagai benda kaku +
+        lentur lateral. Sweep PCI = 3 mm per 3 m panjang (angkat: ½-nya); creep & tumpuan lunak
+        memperbesar sweep saat pengiriman. I_y diambil dari penampang panel ini ({(Iy / 1e9).toFixed(2)}×10⁹ mm⁴).
+      </p>
     </div>
   );
 }

@@ -25,8 +25,30 @@ prestress-calc/.env.local
 prestress-calc/.next/
 prestress-calc/node_modules/
 
-# Screenshots
-prestress-calc/ss-*.png
+# Node (root scratch)
+/node_modules/
+package-lock.json
+prestress-calc/package-lock.json
 
-# PDF books (too large for git)
+# Screenshots & scratch images
+prestress-calc/ss-*.png
+prestress-calc/feat_*.png
+prestress-calc/khan_*.png
+prestress-calc/kong_*.png
+/*.jpg
+/*.png
+/*.webp
+/*.ppm
+
+# Reference source material (not part of the app)
 *.pdf
+*.xls
+*.xlsx
+*.docx
+/[0-9]*.txt
+
+# Local agent/IDE config with machine-specific paths & permissions
+.claude/settings.local.json
+.claude/settings.json
+.claude/agents/
+.claude/skills/
