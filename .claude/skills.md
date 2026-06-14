@@ -1030,3 +1030,33 @@ T = 2.pi.sqrt(W/(g.K)) ; Cs = 1.2.A.S/T^(2/3) <= 2.5 A ; V = Cs.W/R
 min connection (SPC A) = 0.20.DL ; seat N: STD I-A (in) vs LRFD §4.7.4.4 (mm), skew
 precast prestressed girders force-protected -> columns/connections absorb energy
 ```
+
+---
+
+## skill: substructure-engine
+
+```yaml
+name: substructure-engine
+description: >
+  Implement or debug the ordinary-RC substructure engine (beton bertulang biasa,
+  src/engine/substructure.ts), per Wai-Fah Chen "Bridge Engineering: Substructure
+  Design" + AASHTO LRFD §3/§5/§10 + SUSPA/VSL rock anchor. Surfaced as the 🏛️ tab
+  (7 sub-tabs). Trigger on load combinations, RC pier column P-M, bent cap,
+  spread footing, pile group/cap, abutment stability, or ground/rock anchor work.
+  Keep strain control (phiFromStrain, εt ramp) consistent with column.ts/uls.ts.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+load combos: AASHTO Tbl 3.4.1-1 Strength I/III/V + Service I + Extreme I ; γ_p max/min
+phiFromStrain: φ=0.90 (εt>=0.005) ; 0.65/0.75 (εt<=εty) ; linear transition
+pier col: P-M by NA sweep ; ρ 1-8% ; δ = Cm/(1-Pu/0.75Pc) >= 1.0
+footing: q = ΣP/A ± M/S (kern L/6) ; punch b0 @ d/2 (min of 3 vc) ; 1-way @ d ; flexure @ col face
+pile group: R = P/n ± M.x/Σx² ; Converse-Labarre eff ; uplift screen
+abutment: Ka = tan²(45-φ/2) ; FS_ot>=2.0 ; FS_sl>=1.5 ; bearing ; stem RC
+anchor: T_steel=0.6 fpu Aps ; T_bond = π.d.Lb.τ/FS (perm FS>=2.0) ; lock-off 0.7T
+NEVER trust PDF numbers — only chapter/sub-chapter order, procedure, formulas
+```

@@ -31,8 +31,9 @@ import { TransversePTCalculator } from "@/components/TransversePTCalculator";
 import { StrutTieCalculator } from "@/components/StrutTieCalculator";
 import { DeckSlabCalculator } from "@/components/DeckSlabCalculator";
 import { SeismicCalculator } from "@/components/SeismicCalculator";
+import { SubstructureCalculator } from "@/components/SubstructureCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure";
 
 interface Props {
   open: boolean;
@@ -215,6 +216,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Metode beban seragam single-mode — T, C_s, V desain, lebar dudukan min N (PCI BDM Ch.15, STD I-A / LRFD §4.7.4)",
   },
   {
+    key: "substructure",
+    emoji: "🏛️",
+    title: "Bangunan Bawah (RC)",
+    subtitle: "Beton bertulang biasa — kombinasi beban AASHTO LRFD, kolom pier P-M, bent cap, telapak spread, pile cap/grup, abutmen (Rankine + stem), angkur tanah/batuan (Chen Substructure + SUSPA/VSL)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
@@ -333,6 +340,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "transpt" && <TransversePTCalculator />}
           {tab === "stm"     && <StrutTieCalculator />}
           {tab === "seismic" && <SeismicCalculator />}
+          {tab === "substructure" && <SubstructureCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

@@ -1,71 +1,49 @@
-# PRESTRESS-CALC
+# PRESTRESS-CALC Design Suite
 
-Aplikasi web **Single Page Application** untuk perhitungan gelagar beton prategang pasca-tarik (Post-Tension I-Girder) — kontrol tegangan SLS berdasarkan prinsip **ACI 318 / SNI 2847**.
+Aplikasi rekayasa **full-stack** untuk desain jembatan beton **prategang** (utamakan **pasca-tarik / post-tensioned multi-tendon**) per **ACI 318 / SNI 2847 / AASHTO LRFD**, dengan jalur paralel **BS 8110** (Kong & Evans) dan **Eurocode 2 / EN 1992-1-1** (M.K. Hurst) untuk perbandingan silang — lengkap dengan **bangunan bawah beton bertulang biasa** (substructure RC).
 
-## Fitur (MVP v1.0)
+> Basis pengetahuan disarikan dari **123 referensi** (buku 1–122 + 123.ppm): TY Lin, Naaman, Nawy, Libby, Hurst, Menn, Abeles & Bardhan-Roy, PCI Design Handbook & Bridge Design Manual, AASHTO LRFD, FHWA/NCHRP, Krishna Raju, Gilbert, Hewson, PTI, Wai-Fah Chen, dll. Angka di PDF tidak dijadikan acuan — hanya bab, sub-bab, urutan, prosedur, rumus, dan kelengkapannya.
 
-- Input geometri I-girder, material, prategang, dan beban via sidebar Streamlit
-- Perhitungan sifat penampang (A, Ix, Zt, Zb) metode diskretisasi persegi
-- Momen lentur: berat sendiri, SIDL, live load (balok jepit-jepit)
-- Kehilangan prategang servis: estimasi 20% (dapat diubah)
-- Kontrol tegangan tahap **Transfer** dan **Servis**
-- Indikator **AMAN** / **OVERSTRESS**
-- Visualisasi penampang dan diagram tegangan (Plotly)
+## Toggle global (header)
 
-## Instalasi
+- **Satuan**: SI (kN, mm, MPa, kN·m) ⇄ US (kip, in, ksi, kip·ft) — dapat dikonversi sewaktu-waktu.
+- **Varian rumus tegangan**: Standard `f = −P/A ± Pe/Z ∓ M/Z` ⇄ Kernel/TY Lin `f = −P/A·(1±ey/r²) ∓ M/Z` (keduanya ekuivalen).
+- **Sistem prategang**: 🔗 **Post-Tensioned** (diutamakan) ⇄ ⚓ Pretensioned.
+- **Metode**: **Prategang Penuh (Full / Class U)** ⇄ **Prategang Sebagian (LRFD Partial / Class C)** — keduanya dihitung paralel.
 
-```bash
-cd Desain-Prategang
-pip install -r requirements.txt
-```
+## Cakupan modul (engine `src/engine/` + tab kalkulator)
+
+**Inti girder (panel utama):** sifat penampang gross & komposit (`section`), profil tendon & gaya (`tendon`), kehilangan prategang AASHTO Refined + EC2 (`losses`), kontrol tegangan SLS transfer/servis (`sls`), kapasitas lentur/geser ULS + MCFT + tie longitudinal (`uls`, `mcft`), metode ganda Full vs Partial (`dualmethod`), lembar desain terpadu (`designsheet`).
+
+**Kalkulator tambahan (🔧, tiap tab = engine murni):** tiang, kolom prategang, pelat PT, tangki, batang tarik, korbel, dapped-end, bearing pad, slab-on-grade, 🌉 box girder, 🚚 beban jembatan (SNI 1725 + HL-93), 🌀 stabilitas lateral (Timoshenko + Mast roll), 🏗 segmental, 🧩 spliced PT, 🪢 tendon eksternal, ➰ tendon melengkung, 🏭 handling & camber, 🔥 ketahanan api, 🔁 fatik, 🛤 faktor distribusi LRFD, 💧 susut diferensial, ⏳ AEMM jangka panjang, 🧪 member khusus (pipa/pole/sleeper), 🏷 load rating LRFR, 💰 optimasi biaya HPC, 🛞 pelat dek, 🔲 transversal box PT, ▽ strut-and-tie, 🌐 gempa mode-tunggal, 📚 database 52 profil girder.
+
+**🏛️ Bangunan Bawah (RC, beton bertulang biasa)** — 7 sub-tab: ① kombinasi beban AASHTO LRFD, ② kolom pier P-M (kontrol regangan εt + δ pembesaran momen), ③ bent/pier cap, ④ telapak spread (daya dukung, pons, geser, lentur), ⑤ pile cap/grup, ⑥ abutmen (Rankine + stem RC), ⑦ angkur tanah/batuan (SUSPA/VSL).
+
+## Laporan PDF
+
+Tiap perhitungan tampil 3-baris: (1) rumus → (2) rumus tersubstitusi angka → (3) hasil + satuan. Gambar input/proses/output (penampang, tendon, diagram tegangan biru/merah, detailing) menyatu dalam satu lembar desain teknik.
+
+## Tech stack
+
+Next.js (App Router) · TypeScript · Tailwind · Zustand · Recharts · Supabase (simpan/muat proyek) · Vitest (toleransi ±0.5%). Engine = fungsi murni yang mengembalikan objek beku (frozen), aliran data satu-arah 5 layer.
 
 ## Menjalankan
 
 ```bash
-streamlit run app.py
+cd prestress-calc
+npm install
+npm run dev        # http://localhost:3000
+npm test           # vitest (50 assertion)
+npx tsc --noEmit   # type check
+npm run build      # build produksi (deploy Vercel)
 ```
 
-## Struktur Proyek
+> **Catatan lingkungan (mesin ini):** Node ada di `C:\Program Files\nodejs` (belum di PATH shell tool). Di PowerShell jalankan dulu `$env:Path = "C:\Program Files\nodejs;$env:APPDATA\npm;$env:Path"`.
 
-```
-Desain-Prategang/
-├── app.py                      # UI Streamlit
-├── requirements.txt
-├── engine/
-│   ├── section_properties.py   # Sifat penampang (PRD §3.1)
-│   ├── loading.py              # Momen lentur
-│   ├── prestress.py            # Gaya prategang & losses
-│   ├── stress_check.py         # Kontrol tegangan SLS (PRD §5.1)
-│   └── validation.py           # Validasi input
-└── README.md
-```
+### MVP Python lama (arsip)
 
-## Contoh Input Benchmark
+`app.py` + `engine/*.py` (Streamlit) — kontrol tegangan SLS non-komposit saja. `pip install -r requirements.txt && streamlit run app.py`.
 
-| Parameter | Nilai |
-|-----------|-------|
-| H | 1200 mm |
-| b_top / t_top | 400 / 150 mm |
-| t_web | 200 mm |
-| b_bot / t_bot | 600 / 200 mm |
-| L | 20000 mm |
-| f'c / f'ci | 35 / 28 MPa |
-| Aps, ρ, e | 1387 mm², 0.75, 400 mm |
-| SIDL / LL | 5 / 20 kN/m |
+## Konvensi
 
-## Asumsi Perhitungan
-
-- Satuan: mm, MPa, kN, kN/m, kN·m
-- Balok lentur sederhana jepit-jepit: M = wL²/8
-- Penampang non-komposit
-- Transfer: Pi = Pj
-- Servis: Pe = Pj × (1 − loss%)
-- Konvensi tegangan: positif = tarik, negatif = tekan
-
-## Roadmap
-
-- [ ] Profil tendon parabolik / harped (PRD §3.3)
-- [ ] Kehilangan prategang detail (PRD §4)
-- [ ] Penampang komposit (PRD §3.1)
-- [ ] Kapasitas lentur ULS (PRD §5.2)
-- [ ] Lendutan & camber (PRD §5.3)
+Satuan internal N, mm, MPa (konversi ×1000 / ×1e6 di level penampang). Tegangan: **positif = tarik**, negatif = tekan. Sumbu `y=0` di serat bawah girder, jarak ke atas. Modular ratio komposit `n_c = E_deck/E_girder` dihitung dinamis.
