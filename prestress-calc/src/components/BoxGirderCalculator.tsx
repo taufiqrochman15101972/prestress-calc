@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { computeBoxGirder } from "@/engine/boxgirder";
+import { computeBoxGirder, computeBoxDistortion, computeBoxShearLag } from "@/engine/boxgirder";
 import type { BoxGirderInputs } from "@/engine/boxgirder";
 
 const DEFAULT: BoxGirderInputs = {
@@ -48,11 +48,25 @@ function Chk({ label, value, ok }: { label: string; value: string; ok: boolean }
   );
 }
 
+const DEFAULT_EXTRA = { L: 40000, w: 120, diaSpacing: 0 };
+
 export function BoxGirderCalculator() {
   const [inp, setInp] = useState<BoxGirderInputs>(DEFAULT);
+  const [ex, setEx] = useState(DEFAULT_EXTRA);
   const set = (k: keyof BoxGirderInputs, v: number) =>
     setInp(prev => ({ ...prev, [k]: v }));
+  const setX = (k: keyof typeof DEFAULT_EXTRA, v: number) =>
+    setEx(prev => ({ ...prev, [k]: v }));
   const res = useMemo(() => computeBoxGirder(inp), [inp]);
+  const dist = useMemo(() => computeBoxDistortion({
+    bt: inp.bt, tt: inp.tt, bb: inp.bb, tb: inp.tb, tw: inp.tw, H: inp.H,
+    swTop: inp.swTop, swBot: inp.swBot, fc: inp.fc, Ec: inp.Ec,
+    Pecc: inp.Pecc, eEcc: inp.eEcc, L: ex.L, diaSpacing: ex.diaSpacing, Mu: inp.Mu,
+  }), [inp, ex.L, ex.diaSpacing]);
+  const slag = useMemo(() => computeBoxShearLag({
+    bt: inp.bt, tt: inp.tt, bb: inp.bb, tb: inp.tb, tw: inp.tw, H: inp.H,
+    fc: inp.fc, Ec: inp.Ec, L: ex.L, w: ex.w, Ig: res.Ig,
+  }), [inp, ex.L, ex.w, res.Ig]);
   const f = (v: number, d = 1) => v.toFixed(d);
   const e = (v: number, d = 3) => v.toExponential(d);
 
@@ -196,6 +210,53 @@ export function BoxGirderCalculator() {
             value={`${f(res.sigma_strut, 1)} ${res.webCrushOk ? "≤" : ">"} ${f(res.sigma_strut_lim, 1)} MPa`} ok={res.webCrushOk} />
           <Chk label="Slab bawah: σ_long ≥ −0.6f'c (tumpuan menerus)"
             value={`${f(res.sigma_bot_long, 1)} ${res.bottomSlabOk ? "≥" : "<"} ${f(res.sigma_bot_lim, 1)} MPa`} ok={res.bottomSlabOk} />
+        </div>
+
+        {/* Span-level inputs for distortion + shear-lag */}
+        <div>
+          <p className="text-[9px] font-bold text-gray-500 uppercase mb-0.5">Parameter Bentang (distorsi & lendutan)</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            <Nf label="L bentang" unit="mm" value={ex.L} onChange={v => setX("L", v)} step={1000} />
+            <Nf label="w layan" unit="kN/m" value={ex.w} onChange={v => setX("w", v)} step={5} />
+            <Nf label="spasi diafragma" unit="mm" value={ex.diaSpacing} onChange={v => setX("diaSpacing", v)} step={1000} />
+          </div>
+        </div>
+
+        {/* Distortion — deformable cross section (Wright) */}
+        <div>
+          <p className="text-[9px] font-bold text-gray-500 uppercase mb-0.5">Distorsi Penampang (Wright — analogi BEF)</p>
+          <table className="w-full"><tbody>
+            <Row label="T distorsi = P·e" value={f(dist.Tdist, 1)} unit="kN·m" />
+            <Row label="V distorsi (kopel)" value={f(dist.Vdist, 1)} unit="kN" />
+            <Row label="λ karakteristik BEF" value={e(dist.lambda, 2)} unit="1/mm" />
+            <Row label="β·L = λ·L" value={f(dist.betaL, 2)} hi />
+            <Row label="M sudut rangka melintang" value={f(dist.Mcorner, 2)} unit="kN·m/m" />
+            <Row label="σ lentur melintang dinding" value={f(dist.sigmaTransverse, 2)} unit="MPa" />
+            <Row label="σ warping distorsi / σ lentur" value={`${f(dist.warpRatio * 100, 1)}%`} unit="≤10%" hi />
+            <Row label="Spasi diafragma maks disarankan" value={f(dist.diaSpacingMax, 0)} unit="mm" />
+          </tbody></table>
+          <Chk label="Distorsi terkendali (σ_warp ≤ 10% σ_lentur)"
+            value={`${f(dist.warpRatio * 100, 1)}%`} ok={dist.distortionOk} />
+          {dist.needsDiaphragm && (
+            <p className="text-[9px] text-red-600 mt-0.5">⚠ β·L &gt; 4 tanpa diafragma → pasang diafragma interior (≤ {f(dist.diaSpacingMax, 0)} mm).</p>
+          )}
+        </div>
+
+        {/* Shear lag + shear-deformation deflection (book 135) */}
+        <div>
+          <p className="text-[9px] font-bold text-gray-500 uppercase mb-0.5">Shear Lag &amp; Lendutan Deformasi Geser</p>
+          <table className="w-full"><tbody>
+            <Row label="ψ shear-lag flens atas" value={f(slag.psiTop, 3)} />
+            <Row label="b_eff flens atas" value={f(slag.beTop, 0)} unit="mm" hi />
+            <Row label="b_eff flens bawah" value={f(slag.beBot, 0)} unit="mm" />
+            <Row label="δ lentur 5wL⁴/384EI" value={f(slag.deltaBend, 2)} unit="mm" />
+            <Row label="δ geser wL²/8GA_v" value={f(slag.deltaShear, 2)} unit="mm" hi />
+            <Row label="δ total" value={f(slag.deltaTotal, 2)} unit="mm" hi />
+            <Row label="δ_geser / δ_lentur" value={`${f(slag.shearRatio * 100, 1)}%`} />
+            <Row label="Batas L/800" value={f(slag.deflLimit, 2)} unit="mm" />
+          </tbody></table>
+          <Chk label="Lendutan total ≤ L/800"
+            value={`${f(slag.deltaTotal, 2)} ${slag.ok ? "≤" : ">"} ${f(slag.deflLimit, 2)} mm`} ok={slag.ok} />
         </div>
       </div>
     </div>

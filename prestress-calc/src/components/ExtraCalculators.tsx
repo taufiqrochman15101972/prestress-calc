@@ -32,8 +32,9 @@ import { StrutTieCalculator } from "@/components/StrutTieCalculator";
 import { DeckSlabCalculator } from "@/components/DeckSlabCalculator";
 import { SeismicCalculator } from "@/components/SeismicCalculator";
 import { SubstructureCalculator } from "@/components/SubstructureCalculator";
+import { CreepShrinkageCalculator } from "@/components/CreepShrinkageCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh";
 
 interface Props {
   open: boolean;
@@ -216,6 +217,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Metode beban seragam single-mode — T, C_s, V desain, lebar dudukan min N (PCI BDM Ch.15, STD I-A / LRFD §4.7.4)",
   },
   {
+    key: "creepsh",
+    emoji: "🕰",
+    title: "Model Rangkak & Susut",
+    subtitle: "Empat model time-dependent paralel (ACI 209R-92, CEB-FIP MC90/fib MC2010, GL2000, B3) — φ(t,t₀), ε_sh(t), modulus efektif/age-adjusted χ; basis lendutan jangka panjang & kehilangan prategang (buku 123–135)",
+  },
+  {
     key: "substructure",
     emoji: "🏛️",
     title: "Bangunan Bawah (RC)",
@@ -341,6 +348,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "stm"     && <StrutTieCalculator />}
           {tab === "seismic" && <SeismicCalculator />}
           {tab === "substructure" && <SubstructureCalculator />}
+          {tab === "creepsh" && <CreepShrinkageCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

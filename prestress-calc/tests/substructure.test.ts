@@ -93,7 +93,7 @@ describe("spread footing", () => {
 
 describe("pile group", () => {
   // 2×3 group, spacing 1200, P=6000, Mx=1500
-  const piles = [];
+  const piles: { x: number; y: number }[] = [];
   for (let rI = 0; rI < 2; rI++) for (let c = 0; c < 3; c++)
     piles.push({ x: (c - 1) * 1200, y: (rI - 0.5) * 1200 });
   const r = computePileGroup({ piles, P: 6000, Mx: 1500, Pu: 9000, Mux: 2250, pileCap: 1800, rows: 2, cols: 3, spacing: 1200, diameter: 400 });

@@ -247,3 +247,164 @@ export function computeBoxGirder(inp: BoxGirderInputs): BoxGirderResult {
     sigma_bot_long, sigma_bot_lim, bottomSlabOk,
   });
 }
+
+// ════════════════════════════════════════════════════════════════
+//  CROSS-SECTION DISTORTION — deformable cross section
+//  Richard N. Wright, "Design of Box Girders of Deformable Cross
+//  Section" (book 124) + Abdel-Samad/Robinson BEF analogy.
+// ════════════════════════════════════════════════════════════════
+/**
+ * An eccentric load on a box decomposes into (1) flexure, (2) pure St.-Venant
+ * torsion (the shear flow above) and (3) DISTORTION — the cross-section racking
+ * into a parallelogram. Distortion is resisted by the transverse frame stiffness
+ * of the four walls and analysed by the Beam-on-Elastic-Foundation analogy:
+ * distortional warping (longitudinal) ~ "beam bending", transverse frame ~
+ * "elastic foundation". Diaphragms add concentrated supports that limit it.
+ */
+export interface BoxDistortionInputs {
+  bt: number; tt: number; bb: number; tb: number; tw: number; H: number;
+  swTop: number; swBot: number;
+  fc: number; Ec: number;
+  Pecc: number;   // eccentric vertical load (kN)
+  eEcc: number;   // its transverse eccentricity from box centreline (mm)
+  L: number;      // span between bearings (mm)
+  diaSpacing: number; // provided interior diaphragm spacing (mm); 0 = none
+  Mu: number;     // longitudinal bending moment for the stress-ratio check (kN·m)
+}
+export interface BoxDistortionResult {
+  readonly Tdist: number;       // distortional torque P·e (kN·m)
+  readonly bAvg: number; readonly hk: number;
+  readonly Vdist: number;       // self-equilibrating distortional web shear (kN)
+  readonly Kframe: number;      // transverse frame (foundation) stiffness (N/mm per mm)
+  readonly EIdw: number;        // distortional warping rigidity (N·mm²)
+  readonly lambda: number;      // BEF characteristic 1/length (1/mm)
+  readonly betaL: number;       // λ·L (slenderness of the distortional "beam")
+  readonly Mcorner: number;     // transverse frame corner moment (kN·m/m)
+  readonly sigmaTransverse: number; // transverse bending stress in wall (MPa)
+  readonly sigmaWarp: number;   // longitudinal distortional warping stress (MPa)
+  readonly sigmaBend: number;   // longitudinal flexural stress for comparison (MPa)
+  readonly warpRatio: number;   // σ_warp / σ_bend (target < ~0.10)
+  readonly diaSpacingMax: number; // recommended max diaphragm spacing (mm)
+  readonly distortionOk: boolean;
+  readonly needsDiaphragm: boolean;
+}
+export function computeBoxDistortion(i: BoxDistortionInputs): BoxDistortionResult {
+  const Ec = i.Ec > 0 ? i.Ec : 4700 * Math.sqrt(i.fc);
+  const bAvg = (i.swTop + i.swBot) / 2;
+  const hk = i.H - i.tt / 2 - i.tb / 2;
+  const Tdist = (i.Pecc * i.eEcc) / 1e6 * 1e3; // kN·m (P[kN]·e[mm]/1e3)
+  // distortional couple resolved into equal-opposite vertical web shears
+  const Vdist = (Tdist * 1e3) / (2 * bAvg) * 1; // kN (couple / arm), ×1e3: kN·m→kN·mm
+  // ── transverse frame (elastic-foundation) stiffness ──
+  // Single-cell closed frame racking: combine plate flexural rigidities D=E·t³/12.
+  const Dtop = Ec * i.tt ** 3 / 12, Dbot = Ec * i.tb ** 3 / 12, Dweb = Ec * i.tw ** 3 / 12;
+  // racking stiffness per unit length ≈ 12·D_eq/(b·h) with series flexibility of walls
+  const flex = (bAvg / Dtop + bAvg / Dbot + hk / Dweb + hk / Dweb);
+  const Kframe = (24) / (flex * bAvg * hk) * 1e3; // N/mm per mm length (scaled)
+  // ── distortional warping rigidity (single cell, area-flange approx) ──
+  const Aflange = (i.bt * i.tt + i.bb * i.tb) / 2;
+  const EIdw = Ec * Aflange * (bAvg / 2) ** 2 * (hk / 2) ** 2 / 1e3;
+  // ── BEF characteristic length ──
+  const lambda = Math.pow(Kframe / (4 * EIdw), 0.25);
+  const betaL = lambda * i.L;
+  // ── transverse frame corner moment (closed-frame distribution) ──
+  const Mcorner = Vdist * (hk / 1000) / 4; // kN·m/m, racking ¼ to each corner
+  const tWall = Math.min(i.tt, i.tb, i.tw);
+  const sigmaTransverse = (Mcorner * 1e6) / (1000 * tWall ** 2 / 6); // MPa
+  // ── longitudinal distortional warping stress (decays with diaphragms) ──
+  const ld = i.diaSpacing > 0 ? i.diaSpacing : i.L;
+  const decay = 1 / (1 + Math.pow(lambda * ld, 2)); // more diaphragms → smaller
+  const sigmaWarp = sigmaTransverse * (0.5 + 2 * decay);
+  // longitudinal bending stress for ratio (top fibre proxy)
+  const At = i.bt * i.tt, Ab = i.bb * i.tb, hWeb = i.H - i.tt - i.tb;
+  const Aw = i.tw * hWeb;
+  const Atot = At + Ab + 2 * Aw;
+  const yb = (At * (i.H - i.tt / 2) + Ab * (i.tb / 2) + 2 * Aw * (i.tb + hWeb / 2)) / Atot;
+  const Ig = (i.bt * i.tt ** 3) / 12 + At * (i.H - i.tt / 2 - yb) ** 2 +
+    (i.bb * i.tb ** 3) / 12 + Ab * (i.tb / 2 - yb) ** 2 +
+    2 * ((i.tw * hWeb ** 3) / 12 + Aw * (i.tb + hWeb / 2 - yb) ** 2);
+  const sigmaBend = (Math.abs(i.Mu) * 1e6) * (i.H - yb) / Ig;
+  const warpRatio = sigmaBend > 0 ? sigmaWarp / sigmaBend : 0;
+  // recommended max diaphragm spacing: keep λ·l_d ≤ ~ (π) so distortion decays
+  const diaSpacingMax = Math.min(i.L, (Math.PI / 2) / lambda);
+  return Object.freeze({
+    Tdist, bAvg, hk, Vdist, Kframe, EIdw, lambda, betaL,
+    Mcorner, sigmaTransverse, sigmaWarp, sigmaBend, warpRatio,
+    diaSpacingMax,
+    distortionOk: warpRatio <= 0.10,
+    needsDiaphragm: betaL > 4 && i.diaSpacing === 0,
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  SHEAR LAG + SHEAR-DEFORMATION DEFLECTION
+//  "Simplified Calculation Method of Box-Girder Deflection
+//  Considering Full-Section Shear Deformation" (book 135) +
+//  effective-flange-width shear lag.
+// ════════════════════════════════════════════════════════════════
+/**
+ * In a wide-flanged box the flange longitudinal stress is NOT uniform — it lags
+ * near the centre (shear lag), reducing the effective flange width. And for
+ * short, deep boxes the SHEAR deformation of the webs adds materially to the
+ * bending deflection (Timoshenko beam), which Euler–Bernoulli ignores. This
+ * routine returns the effective widths, the bending vs shear deflection split
+ * and the total — the missing piece of long-span box deflection prediction.
+ */
+export interface BoxShearLagInputs {
+  bt: number; tt: number; bb: number; tb: number; tw: number; H: number;
+  fc: number; Ec: number;
+  L: number;      // span (mm)
+  w: number;      // uniform service load (kN/m) for the deflection estimate
+  Ig: number;     // gross 2nd moment of area (mm⁴); 0 → computed here
+}
+export interface BoxShearLagResult {
+  readonly psiTop: number;     // shear-lag effectiveness factor top flange (≤1)
+  readonly psiBot: number;     // shear-lag effectiveness factor bottom flange
+  readonly beTop: number;      // effective top flange width (mm)
+  readonly beBot: number;      // effective bottom flange width (mm)
+  readonly Av: number;         // shear area (2 webs) (mm²)
+  readonly G: number;          // shear modulus (MPa)
+  readonly deltaBend: number;  // bending deflection 5wL⁴/384EI (mm)
+  readonly deltaShear: number; // shear deflection wL²/8GA_v (mm)
+  readonly deltaTotal: number; // total (mm)
+  readonly shearRatio: number; // δ_shear / δ_bend (significance)
+  readonly deflLimit: number;  // L/800 (mm)
+  readonly ok: boolean;
+}
+export function computeBoxShearLag(i: BoxShearLagInputs): BoxShearLagResult {
+  const Ec = i.Ec > 0 ? i.Ec : 4700 * Math.sqrt(i.fc);
+  const G = Ec / 2.4;
+  // shear-lag factor ψ = 1/(1 + (b/L)²·k) — wider flange / shorter span → more lag
+  const lag = (b: number) => 1 / (1 + 6 * (b / 2 / i.L) ** 2 * (1 + 0));
+  const psiTop = Math.min(1, Math.max(0.4, lag(i.bt)));
+  const psiBot = Math.min(1, Math.max(0.4, lag(i.bb)));
+  const beTop = psiTop * i.bt;
+  const beBot = psiBot * i.bb;
+  // shear area = web area (Timoshenko, k_s≈1 for thin webs of a box)
+  const hWeb = i.H - i.tt - i.tb;
+  const Av = 2 * i.tw * hWeb;
+  // section inertia
+  let Ig = i.Ig;
+  if (!(Ig > 0)) {
+    const At = i.bt * i.tt, Ab = i.bb * i.tb, Aw = i.tw * hWeb;
+    const Atot = At + Ab + 2 * Aw;
+    const yb = (At * (i.H - i.tt / 2) + Ab * (i.tb / 2) + 2 * Aw * (i.tb + hWeb / 2)) / Atot;
+    Ig = (i.bt * i.tt ** 3) / 12 + At * (i.H - i.tt / 2 - yb) ** 2 +
+      (i.bb * i.tb ** 3) / 12 + Ab * (i.tb / 2 - yb) ** 2 +
+      2 * ((i.tw * hWeb ** 3) / 12 + Aw * (i.tb + hWeb / 2 - yb) ** 2);
+  }
+  const wN = i.w; // kN/m
+  // δ_bend = 5wL⁴/384EI ; w[kN/m]=N/mm, L[mm], EI[N·mm²]
+  const wNmm = wN; // kN/m == N/mm
+  const deltaBend = (5 * wNmm * i.L ** 4) / (384 * Ec * Ig);
+  // δ_shear = wL²/(8·G·A_v) (UDL, simply supported)
+  const deltaShear = (wNmm * i.L ** 2) / (8 * G * Av);
+  const deltaTotal = deltaBend + deltaShear;
+  const deflLimit = i.L / 800;
+  return Object.freeze({
+    psiTop, psiBot, beTop, beBot, Av, G,
+    deltaBend, deltaShear, deltaTotal,
+    shearRatio: deltaBend > 0 ? deltaShear / deltaBend : 0,
+    deflLimit, ok: deltaTotal <= deflLimit,
+  });
+}

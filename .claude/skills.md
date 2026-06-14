@@ -1060,3 +1060,54 @@ abutment: Ka = tan²(45-φ/2) ; FS_ot>=2.0 ; FS_sl>=1.5 ; bearing ; stem RC
 anchor: T_steel=0.6 fpu Aps ; T_bond = π.d.Lb.τ/FS (perm FS>=2.0) ; lock-off 0.7T
 NEVER trust PDF numbers — only chapter/sub-chapter order, procedure, formulas
 ```
+
+---
+
+## skill: creep-shrinkage-engine
+
+```yaml
+name: creep-shrinkage-engine
+description: >
+  Implement or debug the time-dependent creep & shrinkage prediction engine
+  (src/engine/creepshrinkage.ts), the long-term backbone of books 123-135.
+  Four parallel models: ACI 209R-92, CEB-FIP MC90/fib MC2010, GL2000, B3.
+  Surfaced as the 🕰 tab; feeds ⏳ AEMM, PCI camber, and prestress-loss path.
+  Trigger on φ(t,t0), ε_sh(t), effective/age-adjusted modulus, χ, or model
+  comparison work. Keep χ in 0.6–0.9 and ε_sh negative (shortening).
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+ACI209: φ=(τ^0.6/(10+τ^0.6))·φu ; ε_sh=(t/(35+t))·ε_shu ; RH/size/load-age γ
+CEB-FIP/fib: φ0=φRH·β(fcm)·β(t0) ; βc=(τ/(βH+τ))^0.3 ; ε_cd drying + ε_ca autogenous
+GL2000: Φ(τ) 3-term ; ε_shu·βh·βt    B3: condensed compliance → φ, tanh shrinkage
+E_eff=Ec/(1+φ) ; χ=Trost-Bažant aging ; E_adj=Ec/(1+χφ) (AEMM) ; compareAllModels()
+```
+
+---
+
+## skill: box-girder-engine (extended)
+
+```yaml
+name: box-girder-engine
+description: >
+  Implement or debug the single-cell box-girder engine (src/engine/boxgirder.ts),
+  per Menn Ch.5 (torsion/eccentric split/components) PLUS computeBoxDistortion
+  (Wright deformable cross-section, BEF analogy — book 124) and computeBoxShearLag
+  (effective flange width + Timoshenko shear-deformation deflection — book 135).
+  Surfaced as the 🌉 tab. Trigger on Bredt torsion, distortion/diaphragm spacing,
+  shear lag, or box deflection work.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+torsion: v=T/(2Ak) ; J=4Ak²/∮(ds/t) ; Jbox/Jopen ; eccentric → sym + antisym webs
+distortion: λ=(Kframe/4EI_dw)^0.25 ; βL ; corner M ; σ_warp/σ_bend ≤ 0.10 ; diaphragm
+shear lag: b_eff=ψ·b ; deflection δ=δ_bend(5wL⁴/384EI)+δ_shear(wL²/8GAv) ; ≤ L/800
+```
