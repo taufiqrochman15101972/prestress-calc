@@ -1111,3 +1111,59 @@ torsion: v=T/(2Ak) ; J=4Ak²/∮(ds/t) ; Jbox/Jopen ; eccentric → sym + antisy
 distortion: λ=(Kframe/4EI_dw)^0.25 ; βL ; corner M ; σ_warp/σ_bend ≤ 0.10 ; diaphragm
 shear lag: b_eff=ψ·b ; deflection δ=δ_bend(5wL⁴/384EI)+δ_shear(wL²/8GAv) ; ≤ L/800
 ```
+
+---
+
+## skill: rc-girder-engine
+
+```yaml
+name: rc-girder-engine
+description: >
+  Implement or debug the ordinary RC T-beam BRIDGE SUPERSTRUCTURE engine
+  (src/engine/rcgirder.ts) — beton bertulang biasa, standar Bina Marga
+  "Gelagar Beton Bertulang Balok-T 5–25 m" (book 152) + AASHTO LRFD §4.6.2.6/§5
+  + SNI 2847/1725. Surfaced as the 🧱 Gelagar Balok-T tab. Reuses beta1 &
+  phiFromStrain from substructure.ts (no duplication). Trigger on effective
+  flange width, T-section flexure, RC bridge-girder shear, or strain control.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+1. b_eff = min(L/4, S, b_w+16h_f)
+2. loads → Mu = 1.25DC+1.5DW+1.8LL (SNI 1725 "D": q BTR + p=49 BGT, FBD, × g)
+3. flexure T-section: a=(As−As')fy/(0.85f'c·b_eff); a≤h_f rectangular else true-T
+   (Asf flange overhang couple + Asw web couple); εt=εcu(d−c)/c → phiFromStrain
+   As,min=max(0.25√f'c/fy, 1.4/fy)·b_w·d ; φMn ≥ Mu
+4. shear: Vc=0.17√f'c·b_w·d ; Vs=Vu/φ−Vc ; Av/s ; s_max ; Vs ≤ 0.66√f'c·b_w·d
+```
+
+---
+
+## skill: made-continuous-engine
+
+```yaml
+name: made-continuous-engine
+description: >
+  Implement or debug the made-continuous precast prestressed girder engine
+  (src/engine/madecontinuous.ts) — NCHRP 322 + Freyermuth/PCA + PCI BDM §11.1.
+  DISTINCT from continuous.ts (TY-Lin secondary moments): here simple-span
+  girders are made continuous AFTER prestress+self-weight; time-dependent
+  RESTRAINT moments develop. Surfaced as ⛓️ Gelagar Dibuat Menerus tab.
+  Reuses Ec from substructure.ts. Trigger on restraint moment, continuity
+  diaphragm, positive-moment connection, or creep redistribution at supports.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+rotation method (2/3 equal spans): θ=w·L³/(24EI) ; M_support=−3EI·θ/L
+w_p=8·Pe·e/L² (prestress, +sag) ; self-weight (−hog)
+M_r = (M_p,cont + M_g,cont)·(1−e^−φ) + M_sh·(1−e^−φ)/φ   [shrinkage relieves +]
+positive-moment connection (AASHTO §5.12.3.3): M_conn=max(1.2Mcr, M_r⁺)
+  Mcr=0.5√f'c·Z ; As=M/(φ·fy·jd)
+```

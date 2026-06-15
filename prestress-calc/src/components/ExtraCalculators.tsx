@@ -33,8 +33,10 @@ import { DeckSlabCalculator } from "@/components/DeckSlabCalculator";
 import { SeismicCalculator } from "@/components/SeismicCalculator";
 import { SubstructureCalculator } from "@/components/SubstructureCalculator";
 import { CreepShrinkageCalculator } from "@/components/CreepShrinkageCalculator";
+import { MadeContinuousCalculator } from "@/components/MadeContinuousCalculator";
+import { RCGirderCalculator } from "@/components/RCGirderCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder";
 
 interface Props {
   open: boolean;
@@ -229,6 +231,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Beton bertulang biasa — kombinasi beban AASHTO LRFD, kolom pier P-M, bent cap, telapak spread, pile cap/grup, abutmen (Rankine + stem), angkur tanah/batuan (Chen Substructure + SUSPA/VSL)",
   },
   {
+    key: "rcgirder",
+    emoji: "🧱",
+    title: "Gelagar Balok-T (RC)",
+    subtitle: "Bangunan atas beton bertulang biasa — standar Bina Marga Balok-T 5–25 m: lebar sayap efektif, beban 'D' SNI 1725, lentur penampang-T (kontrol regangan φ), geser sengkang (book 152)",
+  },
+  {
+    key: "madecont",
+    emoji: "⛓️",
+    title: "Gelagar Dibuat Menerus",
+    subtitle: "Pracetak prategang dibuat menerus (NCHRP 322 / PCA) — momen restraint rangkak (1−e^−φ) prategang+sendiri & susut diferensial, sambungan momen-positif diafragma (book 147/148)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
@@ -314,6 +328,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "stm" && "PCI Bridge Design Manual §8.12 + AASHTO LRFD §5.6.3 — Strut-and-Tie Model · f_cu = f'c/(0.8+170ε₁) ≤ 0.85f'c, faktor node CCC 0.85 / CCT 0.75 / CTT 0.65, φ_strut 0.70 / φ_tie 0.90, rangka kepala-pilar"}
           {tab === "seismic" && "PCI Bridge Design Manual Ch.15 — Seismic Design · Metode beban seragam mode-tunggal (STD Div. I-A / LRFD §4.7.4): T=2π√(W/gK), C_s=1.2AS/T^⅔≤2.5A, V/R, lebar dudukan min N anti loss-of-span"}
           {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · AASHTO Box BI–BIV · properti penampang terurut dimensi"}
+          {tab === "rcgirder" && "Standar Jembatan Gelagar Beton Bertulang Balok-T, Bentang 5–25 m (Direktorat Jenderal Bina Marga) + AASHTO LRFD §4.6.2.6 / §5 + SNI 2847:2019 + SNI 1725:2016 — beton bertulang biasa, lentur penampang-T & geser, kontrol regangan"}
+          {tab === "madecont" && "NCHRP Report 322 'Design of Precast Prestressed Bridge Girders Made Continuous' + Freyermuth/PCA + PCI BDM §11.1 — momen restraint M_r=(M_p+M_g)(1−e^−φ)+M_sh(1−e^−φ)/φ, metode rotasi 3-momen, sambungan momen-positif §5.12.3.3"}
         </div>
 
         {/* Content */}
@@ -349,6 +365,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "seismic" && <SeismicCalculator />}
           {tab === "substructure" && <SubstructureCalculator />}
           {tab === "creepsh" && <CreepShrinkageCalculator />}
+          {tab === "rcgirder" && <RCGirderCalculator />}
+          {tab === "madecont" && <MadeContinuousCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

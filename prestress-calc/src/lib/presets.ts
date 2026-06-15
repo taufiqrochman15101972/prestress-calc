@@ -91,6 +91,15 @@ export const GIRDER_PRESETS: GirderPreset[] = [
     girder: { b1: 450, h1: 90, h5: 50, b2: 150, h2: 320, h4: 50, b3: 500, h3: 90 } },
   { id: "pci_36x16", name: "PCI Std I 900", category: "PCI_I", spanRange: "18–27 m",
     girder: { b1: 500, h1: 110, h5: 70, b2: 160, h2: 540, h4: 70, b3: 600, h3: 110 } },
+  // WIKA PCI-Girder H-series (Indonesian standard, book 139 H-170/H-210 + WIKA brochure 143/144)
+  { id: "wika_pci_h125", name: "WIKA PCI-Girder H-125", category: "PCI_I", spanRange: "20–25 m",
+    girder: { b1: 550, h1: 120, h5: 60, b2: 160, h2: 760, h4: 130, b3: 600, h3: 180 } },
+  { id: "wika_pci_h160", name: "WIKA PCI-Girder H-160", category: "PCI_I", spanRange: "25–35 m",
+    girder: { b1: 600, h1: 125, h5: 70, b2: 180, h2: 1010, h4: 170, b3: 650, h3: 225 } },
+  { id: "wika_pci_h170", name: "WIKA PCI-Girder H-170", category: "PCI_I", spanRange: "30–40 m",
+    girder: { b1: 640, h1: 125, h5: 75, b2: 200, h2: 1070, h4: 200, b3: 700, h3: 230 } },
+  { id: "wika_pci_h210", name: "WIKA PCI-Girder H-210", category: "PCI_I", spanRange: "38–50 m",
+    girder: { b1: 700, h1: 130, h5: 90, b2: 200, h2: 1390, h4: 230, b3: 750, h3: 260 } },
 
   // ── NU I-Girder series (Geren & Tadros, PCI Journal 1994) ──
   // "Hard"-metric Nebraska girders: thin 150 web, wide 1225×65 top

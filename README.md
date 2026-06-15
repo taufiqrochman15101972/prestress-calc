@@ -2,7 +2,7 @@
 
 Aplikasi rekayasa **full-stack** untuk desain jembatan beton **prategang** (utamakan **pasca-tarik / post-tensioned multi-tendon**) per **ACI 318 / SNI 2847 / AASHTO LRFD**, dengan jalur paralel **BS 8110** (Kong & Evans) dan **Eurocode 2 / EN 1992-1-1** (M.K. Hurst) untuk perbandingan silang — lengkap dengan **bangunan bawah beton bertulang biasa** (substructure RC).
 
-> Basis pengetahuan disarikan dari **135+ referensi** (buku 1–135 + 123.ppm): TY Lin, Naaman, Nawy, Libby, Hurst, Menn, Wright, Abeles & Bardhan-Roy, PCI Design Handbook & Bridge Design Manual, AASHTO LRFD, FHWA/NCHRP, Krishna Raju, Gilbert, Hewson, PTI, Wai-Fah Chen, serta riset rangkak/susut & box-girder (ACI 209R-92, CEB-FIP/fib, GL2000, B3), dll. Angka di PDF tidak dijadikan acuan — hanya bab, sub-bab, urutan, prosedur, rumus, dan kelengkapannya.
+> Basis pengetahuan disarikan dari **152+ referensi** (buku 1–152 + 123.ppm): TY Lin, Naaman, Nawy, Libby, Hurst, Menn, Wright, Abeles & Bardhan-Roy, PCI Design Handbook & Bridge Design Manual, AASHTO LRFD, FHWA/NCHRP (incl. Report 322 made-continuous), ACI 423.5R partial prestress, Krishna Raju, Gilbert, Hewson, PTI, Wai-Fah Chen, Bridge Engineering Handbook, Sengupta–Menon, standar Bina Marga (Gelagar Balok-T 5–25 m), brosur WIKA-KOBE, serta riset rangkak/susut & box-girder (ACI 209R-92, CEB-FIP/fib, GL2000, B3), dll. Angka di PDF tidak dijadikan acuan — hanya bab, sub-bab, urutan, prosedur, rumus, dan kelengkapannya.
 
 ## Toggle global (header)
 
@@ -19,6 +19,8 @@ Aplikasi rekayasa **full-stack** untuk desain jembatan beton **prategang** (utam
 
 **🏛️ Bangunan Bawah (RC, beton bertulang biasa)** — 7 sub-tab: ① kombinasi beban AASHTO LRFD, ② kolom pier P-M (kontrol regangan εt + δ pembesaran momen), ③ bent/pier cap, ④ telapak spread (daya dukung, pons, geser, lentur), ⑤ pile cap/grup, ⑥ abutmen (Rankine + stem RC), ⑦ angkur tanah/batuan (SUSPA/VSL).
 
+**🧱 Gelagar Balok-T (RC, bangunan atas)** — gelagar beton bertulang biasa standar Bina Marga 5–25 m: lebar sayap efektif, beban "D" SNI 1725, lentur penampang-T (kontrol regangan φ), geser sengkang + sketsa penampang-T. **⛓️ Gelagar Dibuat Menerus** — pracetak prategang dibuat menerus (NCHRP 322 / PCA): momen restraint rangkak & susut diferensial, sambungan momen-positif diafragma.
+
 ## Laporan PDF
 
 Tiap perhitungan tampil 3-baris: (1) rumus → (2) rumus tersubstitusi angka → (3) hasil + satuan. Gambar input/proses/output (penampang, tendon, diagram tegangan biru/merah, detailing) menyatu dalam satu lembar desain teknik.
@@ -33,7 +35,7 @@ Next.js (App Router) · TypeScript · Tailwind · Zustand · Recharts · Supabas
 cd prestress-calc
 npm install
 npm run dev        # http://localhost:3000
-npm test           # vitest (50 assertion)
+npm test           # vitest (70 assertion)
 npx tsc --noEmit   # type check
 npm run build      # build produksi (deploy Vercel)
 ```
