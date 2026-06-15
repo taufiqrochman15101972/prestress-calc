@@ -114,40 +114,63 @@ export function designSheetSVG(inputs: ProjectInputs, r: DesignResults): string 
     : g.yb - 100);
   const layout = suggestTendonLayout(totalStrands);
 
-  // ════ Zone A — composite cross-section ════
-  const secScale = 300 / hC;
-  const secCx = 142, secBase = 396;
-  const deckW = Math.min(deck.widthBeff * secScale, 250);
+  // ════ Zone A — composite cross-section (POTONGAN, fully dimensioned) ════
+  // Auto fit-to-box: scale by BOTH height and width so the section never
+  // overflows its panel regardless of the (live-editable) geometry, yet
+  // stays proportional (single isotropic scale = min of the two).
+  const secCx = 150, secBase = 392;
+  const BOX_H = 296, BOX_HALF_W = 104;          // fixed drawing envelope (px)
+  const drawWmm = Math.max(girder.b1, girder.b3, girder.b2);
+  const deckVisMm = Math.min(deck.widthBeff, drawWmm * 1.6);
+  const fitWmm = Math.max(drawWmm, deckVisMm);
+  const secScale = Math.min(BOX_H / hC, BOX_HALF_W * 2 / fitWmm);
+  const deckW = deckVisMm * secScale;
   const deckH = deck.thicknessTd * secScale;
   const yDeckTop = secBase - hC * secScale;
   const naY = secBase - r.composite.ybc * secScale;
   const naGirderY = secBase - g.yb * secScale;
+  const halfB3 = (girder.b3 / 2) * secScale, halfB1 = (girder.b1 / 2) * secScale;
 
   let strandCircles = "";
   for (const row of tendon.rows) {
     const ry = secBase - row.yFromBottom * secScale;
-    const nDots = Math.min(row.strandCount, 12);
-    const spread = Math.min(girder.b3 * 0.55 * secScale, 90);
+    const nDots = Math.min(row.strandCount, 14);
+    const spread = Math.min(girder.b3 * 0.6 * secScale, halfB3 * 1.7);
     for (let i = 0; i < nDots; i++) {
       const rx = secCx - spread / 2 + (nDots > 1 ? (spread * i) / (nDots - 1) : 0);
-      strandCircles += `<circle cx="${rx}" cy="${ry}" r="2.1" fill="#475569" stroke="#1f2937" stroke-width="0.4"/>`;
+      strandCircles += `<circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="2.1" fill="#475569" stroke="#1f2937" stroke-width="0.4"/>`;
     }
   }
 
+  // dimension-line helpers (engineering witness lines + arrowed extents)
+  const dimV = (x: number, y1: number, y2: number, label: string, col = "#475569") =>
+    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${col}" stroke-width="0.8" marker-start="url(#dim)" marker-end="url(#dim)"/>` +
+    txt(x - 3, (y1 + y2) / 2, label, { size: 7.5, anchor: "middle", fill: col, mono: true })
+      .replace("<text ", `<text transform="rotate(-90 ${x - 3} ${(y1 + y2) / 2})" `);
+  const dimH = (y: number, x1: number, x2: number, label: string, col = "#475569") =>
+    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${col}" stroke-width="0.8" marker-start="url(#dim)" marker-end="url(#dim)"/>` +
+    `<line x1="${x1}" y1="${y - 3}" x2="${x1}" y2="${y + 3}" stroke="${col}" stroke-width="0.5"/>` +
+    `<line x1="${x2}" y1="${y - 3}" x2="${x2}" y2="${y + 3}" stroke="${col}" stroke-width="0.5"/>` +
+    txt((x1 + x2) / 2, y - 3, label, { size: 7.5, anchor: "middle", fill: col, mono: true });
+
+  const dimXleft = secCx - Math.max(halfB3, halfB1) - 16;
   const zoneA = `
-    ${txt(20, 64, "A — PENAMPANG KOMPOSIT", { size: 9.5, w: 700, fill: "#1d4ed8" })}
-    <rect x="${secCx - deckW / 2}" y="${yDeckTop}" width="${deckW}" height="${deckH}"
+    ${txt(20, 64, "A — PENAMPANG KOMPOSIT (POTONGAN TENGAH BENTANG)", { size: 9.5, w: 700, fill: "#1d4ed8" })}
+    <rect x="${(secCx - deckW / 2).toFixed(1)}" y="${yDeckTop.toFixed(1)}" width="${deckW.toFixed(1)}" height="${deckH.toFixed(1)}"
       fill="#e2e8f0" stroke="#64748b" stroke-width="1"/>
     <polygon points="${sectionPolygonPoints(girder, secScale, secCx, secBase)}"
       fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.4"/>
     ${strandCircles}
-    <line x1="${secCx - 124}" y1="${naY}" x2="${secCx + 124}" y2="${naY}" stroke="#dc2626" stroke-width="0.9" stroke-dasharray="5 3"/>
-    ${txt(secCx + 126, naY + 3, `NA komposit y_bc=${f(r.composite.ybc, 0)}`, { size: 7.5, fill: "#dc2626" })}
-    <line x1="${secCx - 124}" y1="${naGirderY}" x2="${secCx + 124}" y2="${naGirderY}" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="3 3"/>
-    ${txt(secCx + 126, naGirderY + 3, `NA girder y_b=${f(g.yb, 0)}`, { size: 7.5, fill: "#64748b" })}
-    <line x1="24" y1="${secBase}" x2="24" y2="${yDeckTop}" stroke="#475569" stroke-width="0.9" marker-start="url(#dim)" marker-end="url(#dim)"/>
-    ${txt(20, (secBase + yDeckTop) / 2, `H = ${f(hC, 0)} mm`, { size: 8, anchor: "middle", fill: "#475569" })?.replace("<text ", `<text transform="rotate(-90 20 ${(secBase + yDeckTop) / 2})" `)}
-    ${txt(secCx, secBase + 14, `${totalStrands} strand Ø${tendon.strandDiameter} · A_ps=${f(Aps, 0)} mm² · e=${f(eMid, 0)} mm`, { size: 8, anchor: "middle", fill: "#334155", mono: true })}
+    <line x1="${secCx - halfB3 - 8}" y1="${naY}" x2="${secCx + halfB3 + 8}" y2="${naY}" stroke="#dc2626" stroke-width="0.9" stroke-dasharray="5 3"/>
+    ${txt(secCx + halfB3 + 10, naY + 3, `NA komp. y_bc=${f(r.composite.ybc, 0)}`, { size: 7, fill: "#dc2626" })}
+    <line x1="${secCx - halfB3 - 8}" y1="${naGirderY}" x2="${secCx + halfB3 + 8}" y2="${naGirderY}" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="3 3"/>
+    ${txt(secCx + halfB3 + 10, naGirderY + 3, `NA girder y_b=${f(g.yb, 0)}`, { size: 7, fill: "#64748b" })}
+    ${dimV(dimXleft, secBase, secBase - hG * secScale, `H=${f(hG, 0)}`, "#1d4ed8")}
+    ${dimV(dimXleft - 14, secBase, yDeckTop, `Htot=${f(hC, 0)}`)}
+    ${dimH(secBase + 16, secCx - halfB3, secCx + halfB3, `b₃=${f(girder.b3, 0)}`)}
+    ${dimH(yDeckTop - 8, secCx - deckW / 2, secCx + deckW / 2, `b_eff=${f(deck.widthBeff, 0)}${deck.widthBeff > deckVisMm + 1 ? "*" : ""}`, "#64748b")}
+    ${dimH(yDeckTop + deckH + 9, secCx - halfB1, secCx + halfB1, `b₁=${f(girder.b1, 0)}`)}
+    ${txt(secCx, secBase + 30, `${totalStrands} strand Ø${tendon.strandDiameter} · A_ps=${f(Aps, 0)} mm² · e=${f(eMid, 0)} mm`, { size: 8, anchor: "middle", fill: "#334155", mono: true })}
   `;
 
   // ════ Zone B — multi-tendon PT profile (elevation) ════
@@ -166,18 +189,29 @@ export function designSheetSVG(inputs: ProjectInputs, r: DesignResults): string 
     ).join(" ");
     tendonPaths += `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.5"/>`;
   }
+  // bearing-support triangles (TAMPAK SAMPING) + end-zone (depth-end) markers
+  const supTri = (xc: number) =>
+    `<polygon points="${xc - 6},${girBotY + 12} ${xc + 6},${girBotY + 12} ${xc},${girBotY + 2}" fill="#cbd5e1" stroke="#475569" stroke-width="0.8"/>` +
+    `<line x1="${xc - 9}" y1="${girBotY + 12}" x2="${xc + 9}" y2="${girBotY + 12}" stroke="#475569" stroke-width="1"/>`;
+  const endZoneW = Math.min(bw2 * 0.06, 22);
   const zoneB = `
-    ${txt(bx, 50, `B — PROFIL TENDON PASCA-TARIK (${layout.nTendons} × tendon-${layout.unitSize}, ${tendon.profileType})`, { size: 9.5, w: 700, fill: "#1d4ed8" })}
+    ${txt(bx, 50, `B — PROFIL TENDON PASCA-TARIK / TAMPAK SAMPING (${layout.nTendons} × tendon-${layout.unitSize}, ${tendon.profileType})`, { size: 9.5, w: 700, fill: "#1d4ed8" })}
     <rect x="${bx}" y="${girTopY}" width="${bw2}" height="${hG * eyScale}" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.1"/>
+    <rect x="${bx}" y="${girTopY}" width="${endZoneW}" height="${hG * eyScale}" fill="#dbeafe" stroke="#1d4ed8" stroke-width="0.5" stroke-dasharray="2 2"/>
+    <rect x="${bx + bw2 - endZoneW}" y="${girTopY}" width="${endZoneW}" height="${hG * eyScale}" fill="#dbeafe" stroke="#1d4ed8" stroke-width="0.5" stroke-dasharray="2 2"/>
+    ${txt(bx + endZoneW / 2, girTopY - 2, "blok ujung", { size: 6.5, anchor: "middle", fill: "#1d4ed8" })}
     <line x1="${bx}" y1="${cgY}" x2="${bx + bw2}" y2="${cgY}" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="4 3"/>
     ${txt(bx + bw2 + 4, cgY + 3, "cgc", { size: 7.5, fill: "#64748b" })}
     ${tendonPaths}
     <rect x="${bx - 7}" y="${cgY - 9}" width="7" height="18" fill="#cbd5e1" stroke="#475569" stroke-width="0.8"/>
     <rect x="${bx + bw2}" y="${cgY - 9}" width="7" height="18" fill="#cbd5e1" stroke="#475569" stroke-width="0.8"/>
     ${txt(bx - 9, cgY - 13, "angkur", { size: 7, fill: "#475569" })}
+    ${supTri(bx + endZoneW / 2)}${supTri(bx + bw2 - endZoneW / 2)}
     <line x1="${bx + bw2 / 2}" y1="${cgY}" x2="${bx + bw2 / 2}" y2="${cgY + eMid * eyScale}" stroke="#dc2626" stroke-width="0.8" stroke-dasharray="2 2"/>
     ${txt(bx + bw2 / 2 + 4, cgY + eMid * eyScale - 4, `e=${f(eMid, 0)} mm`, { size: 7.5, fill: "#dc2626", mono: true })}
-    ${txt(bx + bw2 / 2, girBotY + 14, `L = ${f(loads.spanLength / 1000, 1)} m · P_jack=${f(p.Pj, 0)} kN → P_e=${f(p.Pe, 0)} kN (loss ${f((1 - p.Pe / p.Pj) * 100, 1)}%)`, { size: 8, anchor: "middle", fill: "#334155", mono: true })}
+    <line x1="${bx + endZoneW / 2}" y1="${girBotY + 22}" x2="${bx + bw2 - endZoneW / 2}" y2="${girBotY + 22}" stroke="#475569" stroke-width="0.8" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    ${txt(bx + bw2 / 2, girBotY + 19, `L = ${f(loads.spanLength / 1000, 2)} m (antar perletakan)`, { size: 8, anchor: "middle", fill: "#475569", mono: true })}
+    ${txt(bx + bw2 / 2, girBotY + 34, `P_jack=${f(p.Pj, 0)} kN → P_e=${f(p.Pe, 0)} kN (loss ${f((1 - p.Pe / p.Pj) * 100, 1)}%)`, { size: 8, anchor: "middle", fill: "#334155", mono: true })}
   `;
 
   // ════ Zone C — moment & deflection ════
@@ -252,6 +286,24 @@ export function designSheetSVG(inputs: ProjectInputs, r: DesignResults): string 
     ${dm ? stamp(fx + 132, fy + 306, dm.partial.safe, "PARSIAL LRFD") : ""}
   `;
 
+  // ════ Zone N — material / fabrication NOTES (DED style) ════
+  const grade = tendon.fpu >= 1800 ? "270" : tendon.fpu >= 1690 ? "250" : f(tendon.fpu / 6.895, 0);
+  const jackPct = f(tendon.jackingRatio * 100, 0);
+  const nx = 636, ny = 556, nw = 222, nh = 98;
+  const notes = [
+    "1. Satuan mm kecuali disebut lain. Tegangan +tarik / −tekan.",
+    `2. Beton: girder f'c=${material.fc} (f'ci=${material.fci}), slab/deck ${material.fcDeck} MPa.`,
+    "3. Tulangan: BjTS 420B (D≥10), BjTP 280 (Ø<10); selimut 30, dasar 50 mm.",
+    `4. PC strand Ø${tendon.strandDiameter} mm Grade ${grade} low-relaxation; jacking ${jackPct}% f_pu.`,
+    `5. Sistem PASCA-TARIK ${layout.nTendons}×tendon-${layout.unitSize}; profil ${tendon.profileType}.`,
+  ];
+  const zoneNotes = `
+    <rect x="${nx}" y="${ny}" width="${nw}" height="${nh}" fill="#f8fafc" stroke="#1f2937" stroke-width="0.9"/>
+    <rect x="${nx}" y="${ny}" width="${nw}" height="15" fill="#1d4ed8"/>
+    ${txt(nx + 6, ny + 11, "CATATAN (NOTES)", { size: 8, w: 700, fill: "#ffffff" })}
+    ${notes.map((s, i) => txt(nx + 5, ny + 28 + i * 13.5, s, { size: 7, fill: "#1f2937" })).join("")}
+  `;
+
   // ════ Title block ════
   const tbY = 662;
   const sysLabel = "PASCA-TARIK MULTI-TENDON (POST-TENSIONED)";
@@ -299,6 +351,7 @@ export function designSheetSVG(inputs: ProjectInputs, r: DesignResults): string 
     ${zoneB}
     ${zoneC}
     ${zoneD}
+    ${zoneNotes}
     ${zoneF}
     ${titleBlock}
   </svg>`;
