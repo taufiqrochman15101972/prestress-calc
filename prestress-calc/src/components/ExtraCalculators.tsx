@@ -42,8 +42,9 @@ import { SteelTrussCalculator } from "@/components/SteelTrussCalculator";
 import { SeismicDynamicsCalculator } from "@/components/SeismicDynamicsCalculator";
 import { DxfImportCalculator } from "@/components/DxfImportCalculator";
 import { ForceDiagramsCalculator } from "@/components/ForceDiagramsCalculator";
+import { FemModelerCalculator } from "@/components/FemModelerCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem";
 
 interface Props {
   open: boolean;
@@ -280,6 +281,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Steel truss Pratt/Warren/Howe (Rochman & Suhariyanto) — beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur AASHTO/SNI 1729) (book 210)",
   },
   {
+    key: "fem",
+    emoji: "🧮",
+    title: "FEM Modeler (STAAD-style)",
+    subtitle: "Ekosistem FEM/FEA — Pre-processor (node/member/mesh + 3 cara copy: linear/mirror/rotate), Solver Core (elemen balok-kolom 2D aksial+geser+lentur, solver Float64Array zero-copy), Post-processor (lendutan, diagram N/V/M). Elemen flat-shell Mindlin-SRI bebas shear-locking di pustaka elemen. Target Phase-2: Python(GUI)+Julia(solver)+Zig(memori) native",
+  },
+  {
     key: "forces",
     emoji: "📊",
     title: "Diagram Gaya Dalam & Tegangan",
@@ -381,6 +388,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "fem" && "Ekosistem FEM/FEA (TypeScript, zero-copy Float64Array — pondasi yang siap ditingkatkan ke Python+Julia+Zig native). Pre-processor: tabel node/member gaya STAAD.Pro + 3 cara copy/paste (1 linear repeat/translasi, 2 mirror/cermin, 3 rotate/circular). Solver Core: elemen balok-kolom 2D 2-node 3-DOF (aksial EA/L + lentur + geser Timoshenko bebas shear-locking), perakitan global, BC penalti, solve LU. Post-processor: bentuk lendutan (Hermite), diagram N/V/M, reaksi. Pustaka elemen juga memuat flat-shell Q4 (membran + pelat Mindlin Selective-Reduced-Integration → bebas shear locking, terbukti energi geser nol pada lentur murni). Divalidasi vs rumus tertutup (kantilever P·L³/3EI, SS PL³/48EI & 5wL⁴/384EI, aksial PL/EA)."}
           {tab === "forces" && "Diagram Gaya Dalam, Tegangan & Lendutan (gaya OriginPro / IDEA StatiCa / Robot / MIDAS) — momen utama M_z, momen lateral M_y, geser V_x/V_y, aksial N (tarik +/tekan −), torsi T_x, lendutan ±Z & ±Y. Kurva terisi gradien warna jet real-time saat dicentang; klik di bentang (0–L) → gaya dalam, klik tinggi penampang (−yb…+yt) → tegangan σ (Navier = N/A−M·y/I & kernel = P/A(1∓ey/r²)∓My/I, ekuivalen) + lendutan. Berbasis kesetimbangan mekanika bahan lanjut (pre-FEM), disiapkan untuk peningkatan bertahap ke FEM/FEA."}
           {tab === "dxf" && "Impor DXF (ASCII) — DWG biner tidak dapat dibaca tanpa konverter, ekspor SAVE AS → DXF / DXFOUT. Parser mengekstrak extents (panjang/lebar jembatan), bounding-box profil girder, spasi girder/diafragma (median garis vertikal), nilai DIMENSION (kode 42), teks, & kotak substruktur — lalu terapkan ke bentang/lebar dek/tinggi girder. Geometri dari gambar Anda, bukan tebakan."}
           {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · AASHTO Box BI–BIV · Segmental Box · AASHTO Slab · properti penampang terurut dimensi"}
@@ -427,6 +435,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "seisdyn" && <SeismicDynamicsCalculator />}
           {tab === "dxf" && <DxfImportCalculator />}
           {tab === "forces" && <ForceDiagramsCalculator />}
+          {tab === "fem" && <FemModelerCalculator />}
           {tab === "snieq" && <SeismicSNICalculator />}
           {tab === "cable" && <CableStayedCalculator />}
           {tab === "truss" && <SteelTrussCalculator />}

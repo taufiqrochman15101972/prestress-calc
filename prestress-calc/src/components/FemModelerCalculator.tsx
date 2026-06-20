@@ -1,0 +1,224 @@
+"use client";
+
+import React, { useMemo, useState } from "react";
+import { solveFrame, type FrameModel, type FemNode, type FemMember } from "@/engine/fem/frame";
+import { linearRepeat, mirror, rotateCopy, deflectedShape } from "@/engine/fem/model";
+
+// ── default portal frame (STAAD-like: page opens pre-filled, not blank) ──
+const DEFAULT: FrameModel = {
+  nodes: [{ id: 1, x: 0, y: 0 }, { id: 2, x: 0, y: 3000 }, { id: 3, x: 6000, y: 3000 }, { id: 4, x: 6000, y: 0 }],
+  members: [
+    { id: 1, n1: 1, n2: 2, E: 200000, A: 80000, I: 1.067e9 },
+    { id: 2, n1: 2, n2: 3, E: 200000, A: 80000, I: 1.067e9 },
+    { id: 3, n1: 4, n2: 3, E: 200000, A: 80000, I: 1.067e9 },
+  ],
+  supports: [{ node: 1, ux: true, uy: true, rz: true }, { node: 4, ux: true, uy: true, rz: true }],
+  nodalLoads: [{ node: 2, fx: 20000 }],
+  memberLoads: [{ member: 2, w: -30 }],
+};
+
+const f = (v: number, d = 2) => (isFinite(v) ? v.toFixed(d) : "—");
+type ViewMode = "model" | "deflect" | "N" | "V" | "M";
+
+export function FemModelerCalculator() {
+  const [model, setModel] = useState<FrameModel>(DEFAULT);
+  const [view, setView] = useState<ViewMode>("deflect");
+  const [sec, setSec] = useState({ E: 200000, A: 80000, I: 1.067e9 });
+  // copy controls
+  const [cp, setCp] = useState({ method: "linear" as "linear" | "mirror" | "rotate", dx: 6000, dy: 0, copies: 1, axis: "V" as "V" | "H", at: 6000, cx: 0, cy: 0, dth: 90 });
+
+  const result = useMemo(() => {
+    try { return { r: solveFrame(model), err: "" }; }
+    catch (e) { return { r: null, err: e instanceof Error ? e.message : "error" }; }
+  }, [model]);
+
+  const upd = (m: FrameModel) => setModel(m);
+  const setNode = (id: number, k: "x" | "y", v: number) =>
+    upd({ ...model, nodes: model.nodes.map(n => n.id === id ? { ...n, [k]: v } : n) });
+  const addNode = () => {
+    const id = model.nodes.reduce((m, n) => Math.max(m, n.id), 0) + 1;
+    upd({ ...model, nodes: [...model.nodes, { id, x: 0, y: 0 }] });
+  };
+  const setMember = (id: number, k: "n1" | "n2", v: number) =>
+    upd({ ...model, members: model.members.map(m => m.id === id ? { ...m, [k]: v } : m) });
+  const addMember = () => {
+    const id = model.members.reduce((m, e) => Math.max(m, e.id), 0) + 1;
+    upd({ ...model, members: [...model.members, { id, n1: 1, n2: 2, ...sec }] });
+  };
+  const applySection = () => upd({ ...model, members: model.members.map(m => ({ ...m, ...sec })) });
+  const toggleSup = (node: number, k: "ux" | "uy" | "rz") => {
+    const ex = model.supports.find(s => s.node === node);
+    if (ex) upd({ ...model, supports: model.supports.map(s => s.node === node ? { ...s, [k]: !s[k] } : s) });
+    else upd({ ...model, supports: [...model.supports, { node, ux: false, uy: false, rz: false, [k]: true }] });
+  };
+  const doCopy = () => {
+    const ids = model.members.map(m => m.id);   // copy all (simple selection)
+    if (cp.method === "linear") upd(linearRepeat(model, ids, cp.dx, cp.dy, cp.copies));
+    else if (cp.method === "mirror") upd(mirror(model, ids, cp.axis, cp.at));
+    else upd(rotateCopy(model, ids, cp.cx, cp.cy, cp.dth, cp.copies));
+  };
+
+  // ── view transform ──
+  const xs = model.nodes.map(n => n.x), ys = model.nodes.map(n => n.y);
+  const minX = Math.min(...xs, 0), maxX = Math.max(...xs, 1), minY = Math.min(...ys, 0), maxY = Math.max(...ys, 1);
+  const W = 520, H = 320, pad = 36;
+  const sx = (W - 2 * pad) / Math.max(maxX - minX, 1), sy = (H - 2 * pad) / Math.max(maxY - minY, 1);
+  const sc = Math.min(sx, sy);
+  const px = (x: number) => pad + (x - minX) * sc;
+  const py = (y: number) => H - pad - (y - minY) * sc;
+  const r = result.r;
+  const dispMax = r ? Math.max(r.maxDisp, 1e-9) : 1;
+  const defScale = r ? (0.12 * Math.max(maxX - minX, maxY - minY)) / dispMax : 0;
+
+  const nodeById = new Map(model.nodes.map(n => [n.id, n]));
+  const dispById = new Map((r?.disp ?? []).map(d => [d.node, d]));
+
+  return (
+    <div className="text-[11px]">
+      <p className="text-[9px] font-bold uppercase text-gray-400 mb-1">
+        FEM Modeler (gaya STAAD.Pro) — elemen balok-kolom 2D (aksial+geser+lentur), solver Float64Array zero-copy
+      </p>
+      <div className="flex gap-4 flex-wrap">
+        {/* ── tables / controls ── */}
+        <div className="w-64 flex-none space-y-2">
+          <details open>
+            <summary className="text-[10px] font-bold text-gray-600 cursor-pointer">Node (titik)</summary>
+            <table className="w-full mt-1"><thead><tr className="text-[8px] text-gray-400"><th>id</th><th>X (mm)</th><th>Y (mm)</th><th>Sup</th></tr></thead>
+              <tbody>{model.nodes.map(n => {
+                const s = model.supports.find(su => su.node === n.id);
+                return (<tr key={n.id} className="border-b border-gray-100">
+                  <td className="text-center text-[9px]">{n.id}</td>
+                  <td><input type="number" value={n.x} onChange={e => setNode(n.id, "x", +e.target.value)} className="w-14 text-[9px] font-mono border border-gray-200 rounded px-0.5" /></td>
+                  <td><input type="number" value={n.y} onChange={e => setNode(n.id, "y", +e.target.value)} className="w-14 text-[9px] font-mono border border-gray-200 rounded px-0.5" /></td>
+                  <td className="text-center text-[8px]">
+                    {(["ux", "uy", "rz"] as const).map(k => (
+                      <button key={k} onClick={() => toggleSup(n.id, k)} title={k}
+                        className={`px-0.5 ${s?.[k] ? "text-blue-700 font-bold" : "text-gray-300"}`}>{k[0]}</button>
+                    ))}
+                  </td>
+                </tr>);
+              })}</tbody></table>
+            <button onClick={addNode} className="text-[9px] text-blue-600 mt-0.5">+ node</button>
+          </details>
+
+          <details open>
+            <summary className="text-[10px] font-bold text-gray-600 cursor-pointer">Member (elemen)</summary>
+            <table className="w-full mt-1"><thead><tr className="text-[8px] text-gray-400"><th>id</th><th>n1</th><th>n2</th><th>UDL w</th></tr></thead>
+              <tbody>{model.members.map(m => {
+                const ml = model.memberLoads.find(l => l.member === m.id);
+                return (<tr key={m.id} className="border-b border-gray-100">
+                  <td className="text-center text-[9px]">{m.id}</td>
+                  <td><input type="number" value={m.n1} onChange={e => setMember(m.id, "n1", +e.target.value)} className="w-9 text-[9px] font-mono border border-gray-200 rounded px-0.5" /></td>
+                  <td><input type="number" value={m.n2} onChange={e => setMember(m.id, "n2", +e.target.value)} className="w-9 text-[9px] font-mono border border-gray-200 rounded px-0.5" /></td>
+                  <td><input type="number" value={ml?.w ?? 0} onChange={e => {
+                    const w = +e.target.value; const rest = model.memberLoads.filter(l => l.member !== m.id);
+                    upd({ ...model, memberLoads: w ? [...rest, { member: m.id, w }] : rest });
+                  }} className="w-12 text-[9px] font-mono border border-gray-200 rounded px-0.5" /></td>
+                </tr>);
+              })}</tbody></table>
+            <button onClick={addMember} className="text-[9px] text-blue-600 mt-0.5">+ member</button>
+          </details>
+
+          <details>
+            <summary className="text-[10px] font-bold text-gray-600 cursor-pointer">Penampang (E, A, I)</summary>
+            <div className="grid grid-cols-3 gap-1 mt-1">
+              <input type="number" value={sec.E} onChange={e => setSec({ ...sec, E: +e.target.value })} className="text-[9px] font-mono border rounded px-0.5" title="E MPa" />
+              <input type="number" value={sec.A} onChange={e => setSec({ ...sec, A: +e.target.value })} className="text-[9px] font-mono border rounded px-0.5" title="A mm²" />
+              <input type="number" value={sec.I} onChange={e => setSec({ ...sec, I: +e.target.value })} className="text-[9px] font-mono border rounded px-0.5" title="I mm⁴" />
+            </div>
+            <button onClick={applySection} className="text-[9px] text-blue-600 mt-0.5">terapkan ke semua member</button>
+          </details>
+
+          <details>
+            <summary className="text-[10px] font-bold text-gray-600 cursor-pointer">Copy/Paste (3 cara)</summary>
+            <select value={cp.method} onChange={e => setCp({ ...cp, method: e.target.value as typeof cp.method })} className="w-full text-[9px] border rounded px-0.5 mt-1">
+              <option value="linear">1. Linear repeat (translasi)</option>
+              <option value="mirror">2. Mirror (cermin)</option>
+              <option value="rotate">3. Rotate/circular</option>
+            </select>
+            {cp.method === "linear" && <div className="grid grid-cols-3 gap-1 mt-1">
+              <input type="number" value={cp.dx} onChange={e => setCp({ ...cp, dx: +e.target.value })} className="text-[9px] border rounded px-0.5" title="Δx" />
+              <input type="number" value={cp.dy} onChange={e => setCp({ ...cp, dy: +e.target.value })} className="text-[9px] border rounded px-0.5" title="Δy" />
+              <input type="number" value={cp.copies} onChange={e => setCp({ ...cp, copies: +e.target.value })} className="text-[9px] border rounded px-0.5" title="n" />
+            </div>}
+            {cp.method === "mirror" && <div className="grid grid-cols-2 gap-1 mt-1">
+              <select value={cp.axis} onChange={e => setCp({ ...cp, axis: e.target.value as "V" | "H" })} className="text-[9px] border rounded px-0.5"><option value="V">vertikal</option><option value="H">horizontal</option></select>
+              <input type="number" value={cp.at} onChange={e => setCp({ ...cp, at: +e.target.value })} className="text-[9px] border rounded px-0.5" title="axis at" />
+            </div>}
+            {cp.method === "rotate" && <div className="grid grid-cols-4 gap-1 mt-1">
+              <input type="number" value={cp.cx} onChange={e => setCp({ ...cp, cx: +e.target.value })} className="text-[9px] border rounded px-0.5" title="cx" />
+              <input type="number" value={cp.cy} onChange={e => setCp({ ...cp, cy: +e.target.value })} className="text-[9px] border rounded px-0.5" title="cy" />
+              <input type="number" value={cp.dth} onChange={e => setCp({ ...cp, dth: +e.target.value })} className="text-[9px] border rounded px-0.5" title="Δθ°" />
+              <input type="number" value={cp.copies} onChange={e => setCp({ ...cp, copies: +e.target.value })} className="text-[9px] border rounded px-0.5" title="n" />
+            </div>}
+            <button onClick={doCopy} className="text-[9px] bg-blue-600 text-white rounded px-2 py-0.5 mt-1">Copy semua member</button>
+          </details>
+          <button onClick={() => setModel(DEFAULT)} className="text-[9px] text-gray-500">↺ reset portal default</button>
+        </div>
+
+        {/* ── viewport ── */}
+        <div className="flex-1 min-w-[420px]">
+          <div className="flex gap-1 mb-1">
+            {(["model", "deflect", "N", "V", "M"] as ViewMode[]).map(v => (
+              <button key={v} onClick={() => setView(v)} className={`px-2 py-0.5 rounded text-[10px] border ${view === v ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>
+                {v === "model" ? "Model" : v === "deflect" ? "Lendutan" : v === "N" ? "Aksial N" : v === "V" ? "Geser V" : "Momen M"}
+              </button>
+            ))}
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full border border-gray-200 rounded bg-slate-50">
+            {/* members */}
+            {model.members.map(m => {
+              const a = nodeById.get(m.n1), b = nodeById.get(m.n2); if (!a || !b) return null;
+              return <line key={m.id} x1={px(a.x)} y1={py(a.y)} x2={px(b.x)} y2={py(b.y)} stroke="#334155" strokeWidth="1.6" />;
+            })}
+            {/* diagram or deflected overlay */}
+            {r && view === "deflect" && model.members.map(m => {
+              const a = nodeById.get(m.n1)!, b = nodeById.get(m.n2)!;
+              const d1 = dispById.get(m.n1)!, d2 = dispById.get(m.n2)!;
+              const pts = deflectedShape(a.x, a.y, b.x, b.y, d1, d2, defScale).map(p => `${px(p.x)},${py(p.y)}`).join(" ");
+              return <polyline key={m.id} points={pts} fill="none" stroke="#dc2626" strokeWidth="1.4" />;
+            })}
+            {r && (view === "N" || view === "V" || view === "M") && model.members.map(m => {
+              const mf = r.members.find(x => x.id === m.id); const a = nodeById.get(m.n1)!, b = nodeById.get(m.n2)!;
+              if (!mf) return null;
+              const c = (b.x - a.x) / mf.L, s = (b.y - a.y) / mf.L, nx = -s, ny = c;  // perp
+              const vals = mf.samples.map(sp => view === "N" ? sp.N : view === "V" ? sp.V : sp.M);
+              const vmax = Math.max(...vals.map(Math.abs), 1e-9);
+              const amp = 0.10 * Math.max(maxX - minX, maxY - minY) / vmax;
+              const pts = mf.samples.map((sp, i) => {
+                const xx = a.x + c * sp.x + nx * vals[i] * amp, yy = a.y + s * sp.x + ny * vals[i] * amp;
+                return `${px(xx)},${py(yy)}`;
+              });
+              const base = `${px(a.x)},${py(a.y)} ${pts.join(" ")} ${px(b.x)},${py(b.y)}`;
+              const col = view === "N" ? "#6b7280" : view === "V" ? "#0891b2" : "#1d4ed8";
+              return <polygon key={m.id} points={base} fill={col} fillOpacity="0.18" stroke={col} strokeWidth="1" />;
+            })}
+            {/* nodes + supports */}
+            {model.nodes.map(n => {
+              const s = model.supports.find(su => su.node === n.id);
+              return (<g key={n.id}>
+                <circle cx={px(n.x)} cy={py(n.y)} r="2.5" fill="#1e293b" />
+                <text x={px(n.x) + 4} y={py(n.y) - 4} fontSize="8" fill="#475569">{n.id}</text>
+                {s && (s.ux || s.uy) && <polygon points={`${px(n.x) - 5},${py(n.y) + 9} ${px(n.x) + 5},${py(n.y) + 9} ${px(n.x)},${py(n.y)}`} fill={s.rz ? "#475569" : "none"} stroke="#475569" strokeWidth="1" />}
+              </g>);
+            })}
+          </svg>
+
+          {result.err
+            ? <p className="text-[10px] text-red-600 mt-1">⚠ {result.err}</p>
+            : r && <div className="mt-1 grid grid-cols-3 gap-2">
+              <div className="rounded border border-gray-200 px-2 py-1"><div className="text-[8px] text-gray-500">DOF</div><div className="font-mono text-[11px] font-semibold">{r.dofCount}</div></div>
+              <div className="rounded border border-gray-200 px-2 py-1"><div className="text-[8px] text-gray-500">|u|_max</div><div className="font-mono text-[11px] font-semibold text-red-600">{f(r.maxDisp, 2)} mm</div></div>
+              <div className="rounded border border-gray-200 px-2 py-1"><div className="text-[8px] text-gray-500">M_max</div><div className="font-mono text-[11px] font-semibold text-blue-700">{f(Math.max(...r.members.flatMap(m => m.samples.map(s => Math.abs(s.M)))) / 1e6, 1)} kN·m</div></div>
+            </div>}
+          {r && <div className="mt-1 max-h-28 overflow-auto">
+            <table className="w-full text-[9px]"><thead><tr className="text-gray-400"><th className="text-left">mbr</th><th>N₁(kN)</th><th>V₁(kN)</th><th>M₁(kN·m)</th><th>M₂(kN·m)</th></tr></thead>
+              <tbody className="font-mono">{r.members.map(m => (
+                <tr key={m.id} className="border-b border-gray-100"><td>{m.id}</td><td className="text-right">{f(m.N1 / 1e3, 1)}</td><td className="text-right">{f(m.V1 / 1e3, 1)}</td><td className="text-right">{f(m.M1 / 1e6, 1)}</td><td className="text-right">{f(m.M2 / 1e6, 1)}</td></tr>
+              ))}</tbody></table>
+          </div>}
+        </div>
+      </div>
+    </div>
+  );
+}

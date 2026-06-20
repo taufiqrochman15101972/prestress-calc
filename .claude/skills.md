@@ -1366,3 +1366,40 @@ INPUTS from store: Pe(kN→N), e=yb−yResultant, EI=Ec·Ig, Iy≈Σb³h/12, wBa
 UI: jetColor(norm −1..1) blue→green→red ; click maps px→x (span) / py→y (height).
 NOTE: pre-FEM SoM equilibrium — correct & beautiful now, FEM/FEA later.
 ```
+
+---
+
+## Skill: fem-ecosystem (FEM/FEA core — frame + flat shell)
+
+```
+name: fem-ecosystem
+description: >
+  FEM/FEA ecosystem (engine/fem/) + 🧮 FEM Modeler tab (STAAD.Pro-style).
+  3 layers: Pre-processor (fem/model.ts geometry + 3 copy methods linearRepeat/
+  mirror/rotateCopy + deflectedShape), Solver Core (fem/core.ts LU on Float64Array
+  zero-copy + scatter/matMul; fem/frame.ts 2D beam-column 3-DOF axial+flexure+
+  Timoshenko shear, locking-free; assemble/BC/recover), Post-processor (deflected
+  shape, N/V/M, reactions). Element library + fem/shell.ts flat-shell Q4 (membrane
+  + Mindlin SRI plate → shear-locking-free). Validated vs closed-form. Phase-2
+  target: native Python+Julia+Zig (not in this env). Trigger on: FEM, FEA, finite
+  element, stiffness matrix, beam-column element, shell element, mesh, solver,
+  STAAD/MIDAS/Robot modeler, shear locking.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+FRAME elem (local 6×6): axial EA/L ; bending+shear Timoshenko c=EI/(L³(1+Φ)),
+  Φ=12EI/(G·As·L²) (As=0 → Euler) ; transform Tᵀ k T ; UDL fixed-end [0,wL/2,
+  wL²/12,0,wL/2,−wL²/12]. Assemble K (Float64Array n²), BC penalty 1e30, solveLinear
+  LU. Recover: dl=T·dg, fl=kl·dl−fe ; N/V/M samples along L.
+SHELL Q4 (locking-free): membraneK 8×8 (2×2 Gauss) ; plateK 12×12 = bending Db
+  (2×2 Gauss) + shear Ds (1-pt REDUCED → no locking) ; flatShellK 24×24 (u,v,w,
+  θx,θy,θz + tiny drilling). Validate: membrane εx=1→½E/(1−ν²); plate κx=1 γ=0→½D.
+ZERO-COPY: keep heavy data in Float64Array, pass by reference (assemble→solve→
+  recover seam). Native Python/Julia/Zig backend swaps in behind this seam later.
+3 COPY METHODS: linearRepeat(dx,dy,n) / mirror(V|H,at) / rotateCopy(cx,cy,dθ,n),
+  merge coincident nodes within TOL.
+```
