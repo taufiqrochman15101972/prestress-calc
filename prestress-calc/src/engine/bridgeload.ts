@@ -254,3 +254,55 @@ export function computeBridgeLoad(inp: BridgeLoadInputs): BridgeLoadResult {
     wLive_equiv,
   });
 }
+
+// ─── SNI 1725:2016 secondary / environmental loads ───────────────────────
+// Indonesian bridge actions beyond the live "D" load — wind (EWs/EWl), braking
+// (TB), and uniform temperature (EUn). Flow/procedure per SNI 1725:2016 §8–§9;
+// constants are CODE values, not a worked example.
+
+export interface SecondaryLoadInputs {
+  /** span, m */
+  L: number;
+  /** design wind speed Vw, m/s (SNI: 30 m/s normal, 35 coastal) */
+  Vw: number;
+  /** exposed superstructure side area per metre length, m²/m (≈ girder+deck depth) */
+  windArea: number;
+  /** drag coefficient Cw (≈1.2 for solid girder bridges) */
+  Cw: number;
+  /** braking lane load source: BTR q (kN/m line) + BGT P (kN) per lane */
+  qLane: number;     // kN/m
+  Plane: number;     // kN
+  /** thermal: coefficient α (1/°C), modulus E (MPa), area A (mm²), ΔT range (°C), restrained? */
+  alphaT: number;
+  Esteel: number;
+  Arestr: number;
+  dT: number;
+  restrained: boolean;
+}
+
+export interface SecondaryLoadResult {
+  readonly windPressure: number;  // kPa
+  readonly EWs: number;           // wind on structure, kN/m
+  readonly EWl: number;           // wind on live load, kN/m
+  readonly TB: number;            // braking force, kN
+  readonly epsT: number;          // thermal strain
+  readonly EUn: number;           // temperature force if restrained, kN
+  readonly dLfree: number;        // free thermal elongation, mm
+}
+
+export function computeSecondaryLoads(i: SecondaryLoadInputs): SecondaryLoadResult {
+  // Wind pressure: P_D = 0.0006·Cw·Vw²  (kPa, SNI 1725 Tabel form).
+  const windPressure = 0.0006 * i.Cw * i.Vw * i.Vw;
+  const EWs = windPressure * i.windArea;        // kN/m on structure
+  const EWl = 1.5;                              // kN/m horizontal on live load (SNI §9.6.1.2)
+
+  // Braking force TB = max(25%·truck axle, 5%·(BTR + BGT)) per lane (SNI §8.7).
+  const TB = Math.max(0.25 * 250, 0.05 * (i.qLane * i.L + i.Plane));
+
+  // Uniform temperature EUn — restrained axial force or free elongation.
+  const epsT = i.alphaT * i.dT;
+  const dLfree = epsT * i.L * 1000;             // mm
+  const EUn = i.restrained ? (epsT * i.Esteel * i.Arestr) / 1000 : 0;   // kN
+
+  return Object.freeze({ windPressure, EWs, EWl, TB, epsT, EUn, dLfree });
+}

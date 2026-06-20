@@ -71,12 +71,12 @@ export function InputPanel() {
     updateProjectInfo,
     updateGirder, setGirder,
     updateDeck, updateMaterial, updateTendon,
-    updateLoads, updateImmediateLoss, updatePartialPrestress,
+    updateLoads, updateImmediateLoss, updatePartialPrestress, updateFoundation,
     addTendonRow, removeTendonRow, updateTendonRow,
     saveToLocal, loadFromLocal,
   } = useDesignStore();
 
-  const { projectInfo, girder, deck, material, tendon, loads, immediateLoss, partialPrestress } = inputs;
+  const { projectInfo, girder, deck, material, tendon, loads, immediateLoss, partialPrestress, foundation } = inputs;
   const [saveMsg, setSaveMsg] = React.useState("");
   const [cloudOpen, setCloudOpen] = React.useState(false);
 
@@ -495,6 +495,75 @@ export function InputPanel() {
           onChange={(v) => updateImmediateLoss({ deltaSet: v })} />
         <NumField label="N Kelompok Jack" value={immediateLoss.numJackingGroups} min={1}
           onChange={(v) => updateImmediateLoss({ numJackingGroups: Math.round(v) })} />
+      </div>
+
+      {/* ── Analisis & Desain Pondasi (opt-in → masuk laporan PDF) ── */}
+      <SectionBar>Analisis &amp; Desain Pondasi</SectionBar>
+      <div className="px-3 py-2 space-y-2">
+        <div className="flex items-center gap-2">
+          <input id="fdn-enabled" type="checkbox" checked={foundation.enabled}
+            onChange={(e) => updateFoundation({ enabled: e.target.checked })}
+            className="h-3.5 w-3.5" />
+          <label htmlFor="fdn-enabled" className="text-xs text-gray-700 font-medium">
+            🪨 Sertakan analisis &amp; desain pondasi di laporan
+          </label>
+        </div>
+        {foundation.enabled ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-0.5">
+                <Label>Pemasangan</Label>
+                <select value={foundation.install}
+                  onChange={(e) => updateFoundation({ install: e.target.value as "DRIVEN" | "BORED" })}
+                  className="rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <option value="BORED">Bor (bored/shaft)</option>
+                  <option value="DRIVEN">Pancang (driven)</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Label>Jenis Tanah</Label>
+                <select value={foundation.soil}
+                  onChange={(e) => updateFoundation({ soil: e.target.value as "CLAY" | "SAND" })}
+                  className="rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <option value="SAND">Pasir (φ)</option>
+                  <option value="CLAY">Lempung (c_u)</option>
+                </select>
+              </div>
+              <NumField label="D tiang" unit="m" value={foundation.size} step={0.1}
+                onChange={(v) => updateFoundation({ size: v })} />
+              <NumField label="L tiang" unit="m" value={foundation.length} step={1}
+                onChange={(v) => updateFoundation({ length: v })} />
+              {foundation.soil === "CLAY"
+                ? <NumField label="c_u" unit="kPa" value={foundation.cu} step={5}
+                    onChange={(v) => updateFoundation({ cu: v })} />
+                : <NumField label="φ'" unit="°" value={foundation.phi} step={1}
+                    onChange={(v) => updateFoundation({ phi: v })} />}
+              <NumField label="γ tanah" unit="kN/m³" value={foundation.gamma} step={0.5}
+                onChange={(v) => updateFoundation({ gamma: v })} />
+              <NumField label="M.A.T" unit="m" value={foundation.waterDepth} step={0.5}
+                onChange={(v) => updateFoundation({ waterDepth: v })} />
+              <NumField label="FS" value={foundation.FS} step={0.5}
+                onChange={(v) => updateFoundation({ FS: v })} />
+              <NumField label="baris m" value={foundation.rows} step={1}
+                onChange={(v) => updateFoundation({ rows: Math.round(v) })} />
+              <NumField label="kolom n" value={foundation.cols} step={1}
+                onChange={(v) => updateFoundation({ cols: Math.round(v) })} />
+              <NumField label="spasi s" unit="m" value={foundation.spacing} step={0.1}
+                onChange={(v) => updateFoundation({ spacing: v })} />
+              <NumField label="P demand grup" unit="kN" value={foundation.Pdemand} step={500}
+                onChange={(v) => updateFoundation({ Pdemand: v })} />
+            </div>
+            <p className="text-[10px] text-gray-400">
+              Saat dicentang, §30 Pondasi (kapasitas tiang, grup, penurunan, daya dukung dangkal)
+              ikut dihitung &amp; muncul di laporan PDF. Detail lebih lengkap (lateral Broms,
+              pemancangan dinamik, fondasi mesin) di tab 🪨 Pondasi.
+            </p>
+          </>
+        ) : (
+          <p className="text-[10px] text-gray-400">
+            Tidak dicentang → pondasi tidak ikut dihitung &amp; tidak muncul di laporan.
+          </p>
+        )}
       </div>
 
     </aside>

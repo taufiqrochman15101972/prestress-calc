@@ -35,8 +35,12 @@ import { SubstructureCalculator } from "@/components/SubstructureCalculator";
 import { CreepShrinkageCalculator } from "@/components/CreepShrinkageCalculator";
 import { MadeContinuousCalculator } from "@/components/MadeContinuousCalculator";
 import { RCGirderCalculator } from "@/components/RCGirderCalculator";
+import { FoundationCalculator } from "@/components/FoundationCalculator";
+import { SeismicSNICalculator } from "@/components/SeismicSNICalculator";
+import { CableStayedCalculator } from "@/components/CableStayedCalculator";
+import { SteelTrussCalculator } from "@/components/SteelTrussCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss";
 
 interface Props {
   open: boolean;
@@ -243,6 +247,30 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Pracetak prategang dibuat menerus (NCHRP 322 / PCA) — momen restraint rangkak (1−e^−φ) prategang+sendiri & susut diferensial, sambungan momen-positif diafragma (book 147/148)",
   },
   {
+    key: "foundation",
+    emoji: "🪨",
+    title: "Pondasi (Statik & Dinamik)",
+    subtitle: "Deep & shallow foundation — kapasitas aksial tiang/bore pile/shaft (α/β/Meyerhof), grup (Converse-Labarre + blok), penurunan Vesic, lateral Broms, pemancangan dinamik (ENR/Hiley/Janbu), daya dukung dangkal (Vesic), fondasi mesin half-space + SSI (Bowles/Budhu/Das, books 194–205)",
+  },
+  {
+    key: "snieq",
+    emoji: "🌎",
+    title: "Beban & Gempa SNI",
+    subtitle: "SNI 2833:2016 spektrum respons gempa jembatan (As, S_DS, S_D1, C_sm, zona, R) + SNI 1725:2016 beban sekunder (angin EWs/EWl, rem TB, suhu EUn) — masuk kombinasi beban bangunan bawah (books 207/211)",
+  },
+  {
+    key: "cable",
+    emoji: "🪢",
+    title: "Jembatan Kabel",
+    subtitle: "Cable-stayed (Gimsing & Georgakis) — layout fan/harp/semi-fan, gaya stay = V_trib/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)",
+  },
+  {
+    key: "truss",
+    emoji: "🔺",
+    title: "Jembatan Rangka Baja",
+    subtitle: "Steel truss Pratt/Warren/Howe (Rochman & Suhariyanto) — beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur AASHTO/SNI 1729) (book 210)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
@@ -327,7 +355,11 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "transpt" && "PCI Bridge Design Manual §8.9 (El-Remaily, Tadros) — Transverse Design of Adjacent Box Beams · PT diafragma transversal (grout no-tension + 1.72 MPa) atau tie-rod empiris Oregon Ø22 A449"}
           {tab === "stm" && "PCI Bridge Design Manual §8.12 + AASHTO LRFD §5.6.3 — Strut-and-Tie Model · f_cu = f'c/(0.8+170ε₁) ≤ 0.85f'c, faktor node CCC 0.85 / CCT 0.75 / CTT 0.65, φ_strut 0.70 / φ_tie 0.90, rangka kepala-pilar"}
           {tab === "seismic" && "PCI Bridge Design Manual Ch.15 — Seismic Design · Metode beban seragam mode-tunggal (STD Div. I-A / LRFD §4.7.4): T=2π√(W/gK), C_s=1.2AS/T^⅔≤2.5A, V/R, lebar dudukan min N anti loss-of-span"}
-          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · AASHTO Box BI–BIV · properti penampang terurut dimensi"}
+          {tab === "foundation" && "Bowles 'Foundation Analysis and Design' 5th + Budhu 'Soil Mechanics and Foundations' + US Army TM 5-818-1 + Vulcanhammer (wave equation) + Das 'Principles of Soil Dynamics' + Richart/Ali (machine foundation) — kapasitas tiang statik (α/β/Meyerhof, Q_s+Q_p), grup, penurunan Vesic, lateral Broms, pemancangan dinamik, daya dukung dangkal Vesic, fondasi mesin half-space + SSI (books 194–205)"}
+          {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
+          {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
+          {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · AASHTO Box BI–BIV · Segmental Box · AASHTO Slab · properti penampang terurut dimensi"}
           {tab === "rcgirder" && "Standar Jembatan Gelagar Beton Bertulang Balok-T, Bentang 5–25 m (Direktorat Jenderal Bina Marga) + AASHTO LRFD §4.6.2.6 / §5 + SNI 2847:2019 + SNI 1725:2016 — beton bertulang biasa, lentur penampang-T & geser, kontrol regangan"}
           {tab === "madecont" && "NCHRP Report 322 'Design of Precast Prestressed Bridge Girders Made Continuous' + Freyermuth/PCA + PCI BDM §11.1 — momen restraint M_r=(M_p+M_g)(1−e^−φ)+M_sh(1−e^−φ)/φ, metode rotasi 3-momen, sambungan momen-positif §5.12.3.3"}
         </div>
@@ -367,6 +399,10 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "creepsh" && <CreepShrinkageCalculator />}
           {tab === "rcgirder" && <RCGirderCalculator />}
           {tab === "madecont" && <MadeContinuousCalculator />}
+          {tab === "foundation" && <FoundationCalculator />}
+          {tab === "snieq" && <SeismicSNICalculator />}
+          {tab === "cable" && <CableStayedCalculator />}
+          {tab === "truss" && <SteelTrussCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}
         </div>
 

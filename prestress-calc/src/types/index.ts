@@ -129,6 +129,28 @@ export interface ProjectInfo {
   lokasi: string;
 }
 
+/**
+ * Optional foundation analysis & design module — included in the full design
+ * pipeline & PDF report ONLY when `enabled` is checked (opt-in). Drives the
+ * pile/shaft + group + settlement + shallow-bearing engines (books 194–205).
+ */
+export interface FoundationConfig {
+  enabled: boolean;
+  install: "DRIVEN" | "BORED";
+  shape: "CIRCULAR" | "SQUARE";
+  size: number;          // pile diameter/side, m
+  length: number;        // embedded length, m
+  soil: "CLAY" | "SAND";
+  gamma: number;         // kN/m³
+  waterDepth: number;    // m
+  cu: number;            // kPa
+  phi: number;           // deg
+  FS: number;
+  rows: number; cols: number; spacing: number;
+  Pdemand: number;       // factored load on the group, kN
+  Bf: number; Lf: number; Df: number;   // shallow footing for bearing check, m
+}
+
 export interface ProjectInputs {
   projectInfo: ProjectInfo;
   girder: IGirderGeometry;
@@ -138,6 +160,7 @@ export interface ProjectInputs {
   loads: LoadConfig;
   immediateLoss: ImmediateLossParams;
   partialPrestress: PartialPrestressConfig;
+  foundation: FoundationConfig;
 }
 
 // ─── Settings (persisted alongside inputs) ───────────────────
@@ -432,4 +455,16 @@ export interface DesignResults {
   readonly ec2?: import("@/engine/ec2").EC2Result;
   /** Dual design — Full (Class U) vs LRFD-Partial (Class C) side-by-side */
   readonly dualMethod?: import("@/engine/dualmethod").DualMethodResult;
+  /** Foundation analysis & design (opt-in via foundation.enabled) — books 194–205 */
+  readonly foundation?: FoundationResults;
+}
+
+/** Bundled foundation results — present only when foundation.enabled. */
+export interface FoundationResults {
+  readonly axial: import("@/engine/pilefoundation").PileAxialResult;
+  readonly group: import("@/engine/pilefoundation").PileGroupCapResult;
+  readonly settlement: import("@/engine/pilefoundation").PileSettlementResult;
+  readonly bearing: import("@/engine/foundationdynamics").BearingResult;
+  readonly demandPerPile: number;   // kN
+  readonly axialOk: boolean;
 }

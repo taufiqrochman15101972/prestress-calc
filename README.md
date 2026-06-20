@@ -2,7 +2,7 @@
 
 Aplikasi rekayasa **full-stack** untuk desain jembatan beton **prategang** (utamakan **pasca-tarik / post-tensioned multi-tendon**) per **ACI 318 / SNI 2847 / AASHTO LRFD**, dengan jalur paralel **BS 8110** (Kong & Evans) dan **Eurocode 2 / EN 1992-1-1** (M.K. Hurst) untuk perbandingan silang — lengkap dengan **bangunan bawah beton bertulang biasa** (substructure RC).
 
-> Basis pengetahuan disarikan dari **193+ referensi** (buku 1–193 + 170.xls/174.jpg/123.ppm): TY Lin, Naaman, Nawy, Libby, Hurst, Menn, Wright, Abeles & Bardhan-Roy, PCI Design Handbook & Bridge Design Manual (incl. Appendix B tabel produk standar AASHTO/PCI + AASHTO-PCI-ASBI Segmental Box & PCI U-Girder), AASHTO LRFD (incl. contoh desain AASHTO Type IV), FHWA/NCHRP (incl. Report 322 made-continuous), ACI 423.5R partial prestress, Krishna Raju, Gilbert, Hewson, PTI, Wai-Fah Chen, Bridge Engineering Handbook, Sengupta–Menon, standar Bina Marga (Gelagar Balok-T 5–25 m), Perhitungan Teknis PCI Girder Standar PT Adhi Persada Beton, brosur WIKA-KOBE / WIKA Beton / Waskita Precast, serta riset rangkak/susut & box-girder (ACI 209R-92, CEB-FIP/fib, GL2000, B3), dll. Angka di PDF tidak dijadikan acuan — hanya bab, sub-bab, urutan, prosedur, rumus, dan kelengkapannya. Gambar output desain mengikuti gaya **DED** (Tampak Samping + Potongan berdimensi-lengkap + blok CATATAN/NOTES) dari gambar rujukan A/B/C, **auto-scaling proporsional** (bentuk & angka berubah otomatis saat input diubah, ukuran gambar tetap pas dalam kotak).
+> Basis pengetahuan disarikan dari **218+ referensi** (buku 1–218 + 170.xls/174.jpg/123.ppm + 54 gambar `*.dwg`): TY Lin, Naaman, Nawy, Libby, Hurst, Menn, Wright, Abeles & Bardhan-Roy, PCI Design Handbook & Bridge Design Manual (incl. Appendix B tabel produk standar AASHTO/PCI + AASHTO-PCI-ASBI Segmental Box & PCI U-Girder), AASHTO LRFD (incl. contoh desain AASHTO Type IV), FHWA/NCHRP (incl. Report 322 made-continuous), ACI 423.5R partial prestress, Krishna Raju, Gilbert, Hewson, PTI, Wai-Fah Chen, Bridge Engineering Handbook, Sengupta–Menon, standar Bina Marga (Gelagar Balok-T 5–25 m), Perhitungan Teknis PCI Girder Standar PT Adhi Persada Beton, brosur WIKA-KOBE / WIKA Beton / Waskita Precast, serta riset rangkak/susut & box-girder (ACI 209R-92, CEB-FIP/fib, GL2000, B3), dll. Angka di PDF tidak dijadikan acuan — hanya bab, sub-bab, urutan, prosedur, rumus, dan kelengkapannya. Gambar output desain mengikuti gaya **DED** (Tampak Samping + Potongan berdimensi-lengkap + blok CATATAN/NOTES) dari gambar rujukan A/B/C, **auto-scaling proporsional** (bentuk & angka berubah otomatis saat input diubah, ukuran gambar tetap pas dalam kotak).
 
 ## Toggle global (header)
 
@@ -21,6 +21,8 @@ Aplikasi rekayasa **full-stack** untuk desain jembatan beton **prategang** (utam
 
 **🧱 Gelagar Balok-T (RC, bangunan atas)** — gelagar beton bertulang biasa standar Bina Marga 5–25 m: lebar sayap efektif, beban "D" SNI 1725, lentur penampang-T (kontrol regangan φ), geser sengkang + sketsa penampang-T. **⛓️ Gelagar Dibuat Menerus** — pracetak prategang dibuat menerus (NCHRP 322 / PCA): momen restraint rangkak & susut diferensial, sambungan momen-positif diafragma.
 
+**🪨 Pondasi (Statik & Dinamik)** — fondasi dalam & dangkal (Bowles/Budhu/Das/TM 5-818-1, books 194–205): kapasitas aksial tiang/bore-pile/shaft (α/β/Meyerhof, Q_s+Q_p), grup (Converse-Labarre + blok), penurunan Vesic, lateral Broms, pemancangan dinamik (ENR/Hiley/Janbu), daya dukung dangkal Vesic, fondasi mesin half-space (Richart) + SSI (Veletsos). **Centang opt-in** `🪨 Sertakan analisis & desain pondasi` di panel input → §30 Pondasi ikut dihitung & muncul di laporan PDF (3-baris); jika tidak dicentang, tidak ikut. **🌎 Beban & Gempa SNI** — SNI 2833:2016 spektrum respons gempa jembatan (As/S_DS/S_D1/C_sm/zona/R) + SNI 1725:2016 beban sekunder (angin EWs/EWl, rem TB, suhu EUn) (books 207/211). **🪢 Jembatan Kabel** — cable-stayed Gimsing (fan/harp, gaya stay V/sinθ, Ernst E_eff, aksial pilon) (book 209). **🔺 Jembatan Rangka Baja** — rangka Pratt/Warren/Howe (chord M/h, diagonal V/sinθ, tarik leleh + tekan tekuk F_cr; Rochman & Suhariyanto + SNI 1729) (book 210).
+
 ## Laporan PDF
 
 Tiap perhitungan tampil 3-baris: (1) rumus → (2) rumus tersubstitusi angka → (3) hasil + satuan. Gambar input/proses/output (penampang, tendon, diagram tegangan biru/merah, detailing) menyatu dalam satu lembar desain teknik.
@@ -35,7 +37,7 @@ Next.js (App Router) · TypeScript · Tailwind · Zustand · Recharts · Supabas
 cd prestress-calc
 npm install
 npm run dev        # http://localhost:3000
-npm test           # vitest (74 assertion)
+npm test           # vitest (90 assertion)
 npx tsc --noEmit   # type check
 npm run build      # build produksi (deploy Vercel)
 ```

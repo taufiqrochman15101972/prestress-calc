@@ -193,7 +193,7 @@ export function openPrintReport(
     flexuralStages: fst, mcftShear: mcft,
     momentRedistribution: mrd, lumpSumLosses: lsl,
     thermal: thg, elongation: elo, preliminary: prl, pressureLine: pl,
-    ec2, dualMethod: dm,
+    ec2, dualMethod: dm, foundation: fdn,
   } = results;
 
   const h4 = girder.h4 ?? 0;
@@ -1147,6 +1147,63 @@ ${cw ? section("Lebar Retak — Prategang Sebagian (ACI 224R-01 Gergely-Lutz)", 
   <div class="note-box" style="margin-top:4px">
     PPR = A_ps·f_ps / (A_ps·f_ps + A_s·f_y)<br>
     Prategang sebagian memerlukan kontrol lebar retak (ACI 224R) dan kontrol spasi tulangan (ACI 318-19 §24.3.2).
+  </div>`
+)) : ""}
+
+${fdn ? section("30. Analisis & Desain Pondasi — Statik (Bowles / Budhu / TM 5-818-1)", twoCol(
+  `<div class="sub-title">Kapasitas Aksial Tiang Tunggal</div>` +
+  calc3("Q_ult = Q_s + Q_p",
+    "f_s·A_selimut + q_p·A_ujung",
+    `${n(fdn.axial.Qs, 0)} + ${n(fdn.axial.Qp, 0)}`,
+    `${kN(fdn.axial.Qult)}`) +
+  calc3(`Q_all = Q_ult / FS`,
+    `${n(fdn.axial.Qult, 0)} / FS`,
+    "",
+    `${kN(fdn.axial.Qall)}`) +
+  table(
+    row("f_s rata-rata selimut", n(fdn.axial.fsAvg, 1), "kPa") +
+    row("q_p ujung", n(fdn.axial.qp, 1), "kPa") +
+    row("Q_s selimut", kN(fdn.axial.Qs)) +
+    row("Q_p ujung", kN(fdn.axial.Qp))
+  ) +
+  `<div class="sub-title" style="margin-top:5px">Grup Tiang (Converse-Labarre + blok)</div>` +
+  table(
+    row("Jumlah tiang n", `${fdn.group.nPiles}`) +
+    row("Efisiensi η", n(fdn.group.efficiency, 3)) +
+    row("Q_grup governing", kN(fdn.group.Qgroup)) +
+    row("Q_grup,all", kN(fdn.group.QgroupAll)) +
+    row("Demand / tiang", kN(fdn.demandPerPile))
+  ),
+  `<div class="sub-title">Penurunan (Vesic) & Daya Dukung Dangkal</div>` +
+  table(
+    row("s₁ kompresi tiang", n(fdn.settlement.s1, 3), "mm") +
+    row("s₂ beban ujung", n(fdn.settlement.s2, 3), "mm") +
+    row("s₃ beban selimut", n(fdn.settlement.s3, 3), "mm") +
+    row("s total", n(fdn.settlement.total, 2), "mm") +
+    row("s izin", n(fdn.settlement.allowable, 1), "mm")
+  ) +
+  calc3("q_ult (Vesic)",
+    "c·N_c·s_c·d_c + q·N_q·s_q·d_q + ½γB·N_γ·s_γ·d_γ",
+    `N_c=${n(fdn.bearing.Nc,1)}, N_q=${n(fdn.bearing.Nq,1)}, N_γ=${n(fdn.bearing.Ngamma,1)}`,
+    `${n(fdn.bearing.qult,0)} kPa`) +
+  table(
+    row("q_all = q_ult/FS", n(fdn.bearing.qall, 0), "kPa") +
+    row("q_terjadi = P/(B·L)", n(fdn.bearing.qApplied, 0), "kPa")
+  ) +
+  `<div class="check-row ${fdn.axialOk ? "" : "fail"}">
+    <span class="check-label">Q_all,tiang ≥ demand/tiang</span>
+    <span class="check-value">${n(fdn.axial.Qall,0)} ≥ ${n(fdn.demandPerPile,0)} kN</span>
+    <span>${check(fdn.axialOk)}</span>
+  </div>
+  <div class="check-row ${fdn.settlement.ok ? "" : "fail"}">
+    <span class="check-label">Penurunan ≤ izin</span>
+    <span class="check-value">${n(fdn.settlement.total,1)} ≤ ${n(fdn.settlement.allowable,1)} mm</span>
+    <span>${check(fdn.settlement.ok)}</span>
+  </div>
+  <div class="check-row ${fdn.bearing.ok ? "" : "fail"}">
+    <span class="check-label">q_terjadi ≤ q_all (dangkal)</span>
+    <span class="check-value">${n(fdn.bearing.qApplied,0)} ≤ ${n(fdn.bearing.qall,0)} kPa</span>
+    <span>${check(fdn.bearing.ok)}</span>
   </div>`
 )) : ""}
 

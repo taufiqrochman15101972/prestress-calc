@@ -28,6 +28,8 @@ import { computePreliminary, computePressureLine } from "@/engine/preliminary";
 import {
   ec2Material, ec2StressLimits, ec2TimeDependentLoss, ec2Flexure, ec2Shear,
 } from "@/engine/ec2";
+import { computePileAxialCapacity, computePileGroupCapacity, computePileSettlement } from "@/engine/pilefoundation";
+import { computeBearingCapacity } from "@/engine/foundationdynamics";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -41,6 +43,8 @@ import type {
   ImmediateLossParams,
   ProjectInfo,
   PartialPrestressConfig,
+  FoundationConfig,
+  FoundationResults,
   AppSettings,
   UnitSystem,
   FormulaVariant,
@@ -158,6 +162,7 @@ interface DesignStore {
   updateLoads: (l: Partial<LoadConfig>) => void;
   updateImmediateLoss: (p: Partial<ImmediateLossParams>) => void;
   updatePartialPrestress: (pp: Partial<PartialPrestressConfig>) => void;
+  updateFoundation: (fd: Partial<FoundationConfig>) => void;
   setGirder: (g: IGirderGeometry) => void;
 
   // Settings
@@ -544,6 +549,38 @@ function runPipeline(
     bw: girder.b2,
   });
 
+  // ── Optional foundation module (opt-in via foundation.enabled) ──
+  let foundation: FoundationResults | undefined;
+  const fd = inputs.foundation;
+  if (fd?.enabled) {
+    const axial = computePileAxialCapacity({
+      install: fd.install, shape: fd.shape, size: fd.size, length: fd.length,
+      soil: fd.soil, gamma: fd.gamma, waterDepth: fd.waterDepth,
+      cu: fd.cu, phi: fd.phi, FS: fd.FS,
+    });
+    const group = computePileGroupCapacity({
+      rows: fd.rows, cols: fd.cols, spacing: fd.spacing, size: fd.size,
+      length: fd.length, QultSingle: axial.Qult, soil: fd.soil, cu: fd.cu, FS: fd.FS,
+    });
+    const demandPerPile = fd.Pdemand / group.nPiles;
+    // Working loads split Qs:Qp in proportion to ultimate for the settlement model.
+    const frac = axial.Qult > 0 ? demandPerPile / axial.Qult : 0;
+    const settlement = computePileSettlement({
+      Qp: axial.Qp * frac, Qs: axial.Qs * frac, length: fd.length, size: fd.size,
+      tipArea: axial.tipArea, perimeter: axial.perimeter,
+      Ep: concreteModulus(material.fc), Es: 40, mu: 0.3,
+    });
+    const bearing = computeBearingCapacity({
+      B: fd.Bf, L: fd.Lf, Df: fd.Df, gamma: fd.gamma,
+      c: fd.soil === "CLAY" ? fd.cu : 5, phi: fd.soil === "SAND" ? fd.phi : 0,
+      P: fd.Pdemand, FS: 3,
+    });
+    foundation = Object.freeze({
+      axial, group, settlement, bearing, demandPerPile,
+      axialOk: axial.Qall >= demandPerPile,
+    });
+  }
+
   return {
     results: Object.freeze({
       gross,
@@ -576,12 +613,21 @@ function runPipeline(
       ec2,
       PPR: PPR_val,
       dualMethod,
+      foundation,
     }),
     errors: [],
   };
 }
 
 // ─── Zustand store ───────────────────────────────────────────
+
+const defaultFoundation: FoundationConfig = {
+  enabled: false,
+  install: "BORED", shape: "CIRCULAR", size: 0.8, length: 20,
+  soil: "SAND", gamma: 18, waterDepth: 3, cu: 75, phi: 30, FS: 2.5,
+  rows: 3, cols: 3, spacing: 2.4, Pdemand: 9000,
+  Bf: 4, Lf: 4, Df: 2,
+};
 
 const defaultInputs: ProjectInputs = {
   projectInfo:     defaultProjectInfo,
@@ -592,6 +638,7 @@ const defaultInputs: ProjectInputs = {
   loads:           defaultLoads,
   immediateLoss:   defaultImmediateLoss,
   partialPrestress: defaultPartialPrestress,
+  foundation:      defaultFoundation,
 };
 
 export const useDesignStore = create<DesignStore>((set, get) => ({
@@ -659,6 +706,12 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     }));
     get().compute();
   },
+  updateFoundation: (fd) => {
+    set((s) => ({
+      inputs: { ...s.inputs, foundation: { ...s.inputs.foundation, ...fd } },
+    }));
+    get().compute();
+  },
   setUnitSystem: (s) => {
     set((st) => ({ settings: { ...st.settings, unitSystem: s } }));
   },
@@ -692,6 +745,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
         loads:           { ...defaultInputs.loads,           ...pi.loads },
         immediateLoss:   { ...defaultInputs.immediateLoss,   ...pi.immediateLoss },
         partialPrestress:{ ...defaultInputs.partialPrestress,...pi.partialPrestress },
+        foundation:      { ...defaultInputs.foundation,      ...pi.foundation },
       };
       const ps = parsed.settings ?? {};
       const mergedSettings: AppSettings = {

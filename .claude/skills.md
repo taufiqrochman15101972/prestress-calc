@@ -1167,3 +1167,71 @@ M_r = (M_p,cont + M_g,cont)·(1−e^−φ) + M_sh·(1−e^−φ)/φ   [shrinkage
 positive-moment connection (AASHTO §5.12.3.3): M_conn=max(1.2Mcr, M_r⁺)
   Mcr=0.5√f'c·Z ; As=M/(φ·fy·jd)
 ```
+
+---
+
+## Skill: foundation-engine (Pondasi Statik & Dinamik)
+
+```
+name: foundation-engine
+description: >
+  Deep & shallow foundation analysis/design — engine/pilefoundation.ts
+  (static pile/bore-pile/shaft axial capacity α/β/Meyerhof Q_s+Q_p, group
+  Converse-Labarre + block, settlement Vesic, lateral Broms, dynamic driving
+  ENR/Modified-ENR/Hiley/Janbu) and engine/foundationdynamics.ts (shallow
+  bearing Vesic N_c/N_q/N_γ, machine-foundation half-space Richart k/D/f_n/
+  amplitude 4 modes, SSI Veletsos T̃/T). Books 194–205 (Bowles/Budhu/Das/TM
+  5-818-1/Vulcanhammer). Opt-in via foundation.enabled → §30 in PDF report.
+  Trigger on pile capacity, bored pile, shaft, settlement, lateral pile,
+  pile driving, bearing capacity, machine foundation, SSI, dynamic foundation.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+SINGLE PILE: Q_ult=Q_s+Q_p ; clay f_s=α·c_u, q_p=9·c_u ; sand f_s=K·σ'v·tanδ,
+  q_p=σ'v·N_q (N_q=e^(π tanφ)tan²(45+φ/2)) ; bored: α×0.7, N_q×0.6 ; Q_all=Q_ult/FS
+GROUP: η=1−(θ/90)[(n−1)m+(m−1)n]/(mn), θ=atan(D/s) ; block (clay) governs if closer
+SETTLEMENT (Vesic): s=s1+s2+s3 (pile compression + tip + skin), ≤ 25mm/0.1D
+LATERAL (Broms): short (soil rotation) vs long (yield moment) → min ; clay/sand, free/fixed
+DRIVING: ENR Ru=ηE/(s+C) ; Hiley ×(Wr+n²Wp)/(Wr+Wp) ; Janbu Ku(λe,Cd) ; Ra=Ru/FS
+BEARING (Vesic): q_ult=cNc·sc·dc+qNq·sq·dq+½γB·Nγ·sγ·dγ ; q_all=q_ult/FS
+MACHINE (half-space): r0 per mode ; kz=4Gr0/(1−ν) etc ; B mass-ratio, D damping,
+  fn=√(k/m)/2π ; rotating-mass A=(m_e e/m)·r²/√((1−r²)²+(2Dr)²) ; resonance ±20%
+SSI (Veletsos): (T̃/T)²=1+k/Kx+k·h²/Kφ
+```
+
+---
+
+## Skill: indo-load-seismic-struct (Beban/Gempa SNI + Kabel + Rangka)
+
+```
+name: indo-load-seismic-struct
+description: >
+  Indonesian loading + seismic + bridge-structure engines — sni2833seismic.ts
+  (SNI 2833:2016 response spectrum As/S_DS/S_D1/T0/Ts/C_sm, zone/SDC, R),
+  cablestayed.ts (Gimsing cable-stayed: stay V/sinθ, Ernst E_eff, pylon axial),
+  steeltruss.ts (Pratt/Warren/Howe: chord M/h, diagonal V/sinθ, tension yield +
+  compression buckling F_cr), and bridgeload.ts computeSecondaryLoads (SNI 1725
+  wind EWs/EWl, brake TB, temperature EUn). Books 207/209/210/211. Tabs 🌎/🪢/🔺.
+  Trigger on SNI 2833, response spectrum, cable-stayed, pylon, steel truss,
+  rangka baja, wind load, braking force, temperature load, SNI 1725.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+SNI 2833 spectrum: As=Fpga·PGA ; S_DS=Fa·Ss ; S_D1=Fv·S1 ; T0=0.2 S_D1/S_DS ;
+  Ts=S_D1/S_DS ; C_sm: ramp<T0, plateau S_DS [T0..Ts], S_D1/T >Ts ; EQ=C_sm·W/R
+CABLE-STAYED: stay force=w·trib/sinθ ; A=force/σ_all ; Ernst Ee=E/(1+γ²Lh²E/12σ³) ;
+  pylon axial=Σforce·sinθ ; deck compression=Σforce·cosθ
+STEEL TRUSS: Mmax=wL²/8 → chord=M/h ; Vend → diagonal=V/sinθ ;
+  tension φPn=0.90·Fy·A ; compression Fcr (0.658^(Fy/Fe)·Fy or 0.877Fe), φ=0.90
+SECONDARY (SNI 1725): wind P=0.0006·Cw·Vw² (kPa) ; EWl=1.5 kN/m ;
+  TB=max(25%·250, 5%(qL+P)) ; EUn=α·ΔT·E·A (restrained)
+NOTE: PDF numbers are NOT code references — only chapter/order/procedure.
+```
