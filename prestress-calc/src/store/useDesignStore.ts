@@ -30,6 +30,7 @@ import {
 } from "@/engine/ec2";
 import { computePileAxialCapacity, computePileGroupCapacity, computePileSettlement } from "@/engine/pilefoundation";
 import { computeBearingCapacity } from "@/engine/foundationdynamics";
+import { computeSDOF, computeCapacityDesign, computeLiquefaction } from "@/engine/seismicdynamics";
 import { concreteModulus } from "@/lib/utils";
 import type {
   ProjectInputs,
@@ -575,9 +576,25 @@ function runPipeline(
       c: fd.soil === "CLAY" ? fd.cu : 5, phi: fd.soil === "SAND" ? fd.phi : 0,
       P: fd.Pdemand, FS: 3,
     });
+    // ── dynamic & seismic substructure (seamlessly chained) ──
+    // Derive cantilever pier stiffness K = 3·E·I/H³ → SDOF demand → capacity check.
+    const Epier = concreteModulus(material.fc) * 1000;        // MPa → kPa
+    const Ipier = (Math.PI * fd.pierD ** 4) / 64;             // m⁴
+    const pierK = (3 * Epier * Ipier) / fd.pierH ** 3;        // kN/m
+    const sdof = computeSDOF({ W: fd.Pdemand, K: pierK, zeta: 0.05, Sa: fd.seismicSa });
+    const capacity = computeCapacityDesign({
+      Mp: fd.pierMp, H: fd.pierH, fixity: "CANTILEVER", lambdaO: 1.2, D: fd.pierD,
+      phiY: 2.25 * (material.fy / 200000) / fd.pierD, phiU: 0.035,
+      fye: material.fy, dbl: 25, Pdl: fd.Pdemand, deltaD: sdof.Sd,
+    });
+    const liquefaction = computeLiquefaction({
+      z: Math.max(fd.length / 3, 3), gamma: fd.gamma, waterDepth: fd.waterDepth,
+      amax: fd.amax, N160: fd.N160, fines: fd.fines, Mw: fd.Mw,
+    });
     foundation = Object.freeze({
       axial, group, settlement, bearing, demandPerPile,
       axialOk: axial.Qall >= demandPerPile,
+      seismic: Object.freeze({ sdof, capacity, liquefaction, pierK }),
     });
   }
 
@@ -627,6 +644,8 @@ const defaultFoundation: FoundationConfig = {
   soil: "SAND", gamma: 18, waterDepth: 3, cu: 75, phi: 30, FS: 2.5,
   rows: 3, cols: 3, spacing: 2.4, Pdemand: 9000,
   Bf: 4, Lf: 4, Df: 2,
+  seismicSa: 0.6, pierMp: 4500, pierH: 8, pierD: 1.2,
+  amax: 0.35, Mw: 7.0, N160: 12, fines: 15,
 };
 
 const defaultInputs: ProjectInputs = {

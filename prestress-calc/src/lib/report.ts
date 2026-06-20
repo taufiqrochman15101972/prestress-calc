@@ -1207,6 +1207,54 @@ ${fdn ? section("30. Analisis & Desain Pondasi — Statik (Bowles / Budhu / TM 5
   </div>`
 )) : ""}
 
+${fdn?.seismic ? section("31. Analisis Dinamik & Desain Gempa Bangunan Bawah (AASHTO Guide Spec / Caltrans SDC / SNI 2833)", twoCol(
+  `<div class="sub-title">Respons SDOF Pilar</div>` +
+  calc3("K = 3·E·I/H³ (kantilever)",
+    "",
+    "",
+    `${n(fdn.seismic.pierK, 0)} kN/m`) +
+  calc3("T = 2π√(m/K), Sd = Sa·g/ω²",
+    `T=${n(fdn.seismic.sdof.T, 3)} s, ω=${n(fdn.seismic.sdof.omega, 2)} rad/s`,
+    "",
+    `Sd = ${n(fdn.seismic.sdof.Sd * 1000, 1)} mm, V = ${kN(fdn.seismic.sdof.Vbase)}`) +
+  `<div class="sub-title" style="margin-top:5px">Likuifaksi (Seed–Idriss / Youd)</div>` +
+  calc3("FS = CRR·MSF / CSR",
+    `CSR=${n(fdn.seismic.liquefaction.CSR, 3)}, CRR=${n(fdn.seismic.liquefaction.CRR75, 3)}, MSF=${n(fdn.seismic.liquefaction.MSF, 2)}`,
+    "",
+    `FS = ${n(fdn.seismic.liquefaction.FS, 2)}`) +
+  table(
+    row("σ'_v efektif", n(fdn.seismic.liquefaction.sigmaVeff, 1), "kPa") +
+    row("(N₁)₆₀cs", n(fdn.seismic.liquefaction.N160cs, 1))
+  ),
+  `<div class="sub-title">Desain Kapasitas Pilar (Sendi Plastis)</div>` +
+  calc3("M_po = λ_o·M_p ; V_po = M_po/H",
+    `M_po = 1.2·${n(fdn.seismic.capacity.Mpo / 1.2, 0)}`,
+    "",
+    `M_po = ${kNm(fdn.seismic.capacity.Mpo)}, V_po = ${kN(fdn.seismic.capacity.Vpo)}`) +
+  table(
+    row("L_p panjang sendi plastis", n(fdn.seismic.capacity.Lp, 3), "m") +
+    row("Δ_y leleh", n(fdn.seismic.capacity.deltaY * 1000, 1), "mm") +
+    row("Δ_C kapasitas perpindahan", n(fdn.seismic.capacity.deltaC * 1000, 1), "mm") +
+    row("μ_Δ daktilitas perpindahan", n(fdn.seismic.capacity.muDelta, 2)) +
+    row("Δ_D demand (= Sd)", n(fdn.seismic.sdof.Sd * 1000, 1), "mm")
+  ) +
+  `<div class="check-row ${fdn.seismic.capacity.displOk ? "" : "fail"}">
+    <span class="check-label">Δ_D ≤ Δ_C (kapasitas perpindahan)</span>
+    <span class="check-value">${n(fdn.seismic.sdof.Sd*1000,0)} ≤ ${n(fdn.seismic.capacity.deltaC*1000,0)} mm</span>
+    <span>${check(fdn.seismic.capacity.displOk)}</span>
+  </div>
+  <div class="check-row ${fdn.seismic.capacity.PdeltaOk ? "" : "fail"}">
+    <span class="check-label">P-Δ: P_dl·Δ ≤ 0,25·M_p</span>
+    <span class="check-value">rasio ${n(fdn.seismic.capacity.PdeltaRatio,3)} ≤ 0,25</span>
+    <span>${check(fdn.seismic.capacity.PdeltaOk)}</span>
+  </div>
+  <div class="check-row ${!fdn.seismic.liquefaction.liquefies ? "" : "fail"}">
+    <span class="check-label">FS ≥ 1,0 (tak terlikuifaksi)</span>
+    <span class="check-value">FS = ${n(fdn.seismic.liquefaction.FS,2)}</span>
+    <span>${check(!fdn.seismic.liquefaction.liquefies)}</span>
+  </div>`
+)) : ""}
+
 <div class="footer">
   <span>PRESTRESS-CALC — ACI 318-19 / SNI 2847:2019 / AASHTO LRFD Refined Method</span>
   <span>${now}</span>

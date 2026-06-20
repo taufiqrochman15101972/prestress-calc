@@ -553,10 +553,30 @@ export function InputPanel() {
               <NumField label="P demand grup" unit="kN" value={foundation.Pdemand} step={500}
                 onChange={(v) => updateFoundation({ Pdemand: v })} />
             </div>
+            <p className="text-[10px] font-semibold text-gray-500 pt-1">🌋 Dinamik &amp; Gempa Bangunan Bawah</p>
+            <div className="grid grid-cols-2 gap-2">
+              <NumField label="Sa @T pilar" unit="g" value={foundation.seismicSa} step={0.05}
+                onChange={(v) => updateFoundation({ seismicSa: v })} />
+              <NumField label="M_p pilar" unit="kN·m" value={foundation.pierMp} step={250}
+                onChange={(v) => updateFoundation({ pierMp: v })} />
+              <NumField label="H pilar" unit="m" value={foundation.pierH} step={0.5}
+                onChange={(v) => updateFoundation({ pierH: v })} />
+              <NumField label="D pilar" unit="m" value={foundation.pierD} step={0.1}
+                onChange={(v) => updateFoundation({ pierD: v })} />
+              <NumField label="a_max" unit="g" value={foundation.amax} step={0.05}
+                onChange={(v) => updateFoundation({ amax: v })} />
+              <NumField label="Mw gempa" value={foundation.Mw} step={0.1}
+                onChange={(v) => updateFoundation({ Mw: v })} />
+              <NumField label="(N₁)₆₀" value={foundation.N160} step={1}
+                onChange={(v) => updateFoundation({ N160: Math.round(v) })} />
+              <NumField label="fines FC" unit="%" value={foundation.fines} step={1}
+                onChange={(v) => updateFoundation({ fines: v })} />
+            </div>
             <p className="text-[10px] text-gray-400">
               Saat dicentang, §30 Pondasi (kapasitas tiang, grup, penurunan, daya dukung dangkal)
-              ikut dihitung &amp; muncul di laporan PDF. Detail lebih lengkap (lateral Broms,
-              pemancangan dinamik, fondasi mesin) di tab 🪨 Pondasi.
+              &amp; §31 Dinamik/Gempa (respons SDOF, desain kapasitas pilar sendi-plastis &amp; P-Δ,
+              likuifaksi) ikut dihitung &amp; muncul di laporan PDF. Detail lebih lengkap di tab
+              🪨 Pondasi &amp; 🌋 Dinamik &amp; Gempa.
             </p>
           </>
         ) : (

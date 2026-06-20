@@ -21,7 +21,7 @@ Aplikasi rekayasa **full-stack** untuk desain jembatan beton **prategang** (utam
 
 **🧱 Gelagar Balok-T (RC, bangunan atas)** — gelagar beton bertulang biasa standar Bina Marga 5–25 m: lebar sayap efektif, beban "D" SNI 1725, lentur penampang-T (kontrol regangan φ), geser sengkang + sketsa penampang-T. **⛓️ Gelagar Dibuat Menerus** — pracetak prategang dibuat menerus (NCHRP 322 / PCA): momen restraint rangkak & susut diferensial, sambungan momen-positif diafragma.
 
-**🪨 Pondasi (Statik & Dinamik)** — fondasi dalam & dangkal (Bowles/Budhu/Das/TM 5-818-1, books 194–205): kapasitas aksial tiang/bore-pile/shaft (α/β/Meyerhof, Q_s+Q_p), grup (Converse-Labarre + blok), penurunan Vesic, lateral Broms, pemancangan dinamik (ENR/Hiley/Janbu), daya dukung dangkal Vesic, fondasi mesin half-space (Richart) + SSI (Veletsos). **Centang opt-in** `🪨 Sertakan analisis & desain pondasi` di panel input → §30 Pondasi ikut dihitung & muncul di laporan PDF (3-baris); jika tidak dicentang, tidak ikut. **🌎 Beban & Gempa SNI** — SNI 2833:2016 spektrum respons gempa jembatan (As/S_DS/S_D1/C_sm/zona/R) + SNI 1725:2016 beban sekunder (angin EWs/EWl, rem TB, suhu EUn) (books 207/211). **🪢 Jembatan Kabel** — cable-stayed Gimsing (fan/harp, gaya stay V/sinθ, Ernst E_eff, aksial pilon) (book 209). **🔺 Jembatan Rangka Baja** — rangka Pratt/Warren/Howe (chord M/h, diagonal V/sinθ, tarik leleh + tekan tekuk F_cr; Rochman & Suhariyanto + SNI 1729) (book 210).
+**🪨 Pondasi (Statik & Dinamik)** — fondasi dalam & dangkal (Bowles/Budhu/Das/TM 5-818-1, books 194–205): kapasitas aksial tiang/bore-pile/shaft (α/β/Meyerhof, Q_s+Q_p), grup (Converse-Labarre + blok), penurunan Vesic, lateral Broms, pemancangan dinamik (ENR/Hiley/Janbu), daya dukung dangkal Vesic, fondasi mesin half-space (Richart) + SSI (Veletsos). **Centang opt-in** `🪨 Sertakan analisis & desain pondasi` di panel input → §30 Pondasi ikut dihitung & muncul di laporan PDF (3-baris); jika tidak dicentang, tidak ikut. **🌋 Dinamik & Gempa Bangunan Bawah** — analisis dinamik & desain gempa substruktur (AASHTO Guide Spec Seismic / Caltrans SDC / Priestley DBD / SNI 2833 / Seed–Idriss): respons SDOF (T, Sd, V_base), modal 2-DOF SRSS, desain kapasitas pilar (M_po overstrength, L_p sendi plastis, μ_Δ daktilitas, P-Δ), likuifaksi (CSR/CRR/MSF/FS). Ikut terhitung & muncul di **§31 laporan PDF** saat centang Pondasi aktif. **🌎 Beban & Gempa SNI** — SNI 2833:2016 spektrum respons gempa jembatan (As/S_DS/S_D1/C_sm/zona/R) + SNI 1725:2016 beban sekunder (angin EWs/EWl, rem TB, suhu EUn) (books 207/211). **🪢 Jembatan Kabel** — cable-stayed Gimsing (fan/harp, gaya stay V/sinθ, Ernst E_eff, aksial pilon) (book 209). **🔺 Jembatan Rangka Baja** — rangka Pratt/Warren/Howe (chord M/h, diagonal V/sinθ, tarik leleh + tekan tekuk F_cr; Rochman & Suhariyanto + SNI 1729) (book 210).
 
 ## Laporan PDF
 
@@ -37,7 +37,7 @@ Next.js (App Router) · TypeScript · Tailwind · Zustand · Recharts · Supabas
 cd prestress-calc
 npm install
 npm run dev        # http://localhost:3000
-npm test           # vitest (90 assertion)
+npm test           # vitest (102 assertion)
 npx tsc --noEmit   # type check
 npm run build      # build produksi (deploy Vercel)
 ```

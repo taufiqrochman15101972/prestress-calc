@@ -149,6 +149,15 @@ export interface FoundationConfig {
   rows: number; cols: number; spacing: number;
   Pdemand: number;       // factored load on the group, kN
   Bf: number; Lf: number; Df: number;   // shallow footing for bearing check, m
+  // ── dynamic / seismic substructure (computed together when enabled) ──
+  seismicSa: number;     // spectral acceleration at pier period, g
+  pierMp: number;        // pier column plastic moment M_p, kN·m
+  pierH: number;         // pier clear height, m
+  pierD: number;         // pier column diameter, m
+  amax: number;          // peak ground acceleration, g (liquefaction)
+  Mw: number;            // earthquake moment magnitude
+  N160: number;          // SPT (N1)60 at the layer
+  fines: number;         // fines content, %
 }
 
 export interface ProjectInputs {
@@ -467,4 +476,11 @@ export interface FoundationResults {
   readonly bearing: import("@/engine/foundationdynamics").BearingResult;
   readonly demandPerPile: number;   // kN
   readonly axialOk: boolean;
+  /** dynamic & seismic substructure (computed together with foundation) */
+  readonly seismic: {
+    readonly sdof: import("@/engine/seismicdynamics").SDOFResult;
+    readonly capacity: import("@/engine/seismicdynamics").CapacityDesignResult;
+    readonly liquefaction: import("@/engine/seismicdynamics").LiquefactionResult;
+    readonly pierK: number;   // derived cantilever stiffness 3EI/H³, kN/m
+  };
 }

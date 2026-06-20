@@ -1235,3 +1235,41 @@ SECONDARY (SNI 1725): wind P=0.0006·Cw·Vw² (kPa) ; EWl=1.5 kN/m ;
   TB=max(25%·250, 5%(qL+P)) ; EUn=α·ΔT·E·A (restrained)
 NOTE: PDF numbers are NOT code references — only chapter/order/procedure.
 ```
+
+---
+
+## Skill: seismic-dynamics-substructure (Dinamik & Gempa Bangunan Bawah)
+
+```
+name: seismic-dynamics-substructure
+description: >
+  Dynamic analysis & seismic DESIGN of the substructure — engine/seismicdynamics.ts:
+  computeSDOF (pier as SDOF: T=2π√(m/K), damping B, Sd=Sa·g/ω², Vbase),
+  computeModal2 (2-DOF eigen det(K−ω²M)=0, mode shapes, participation, SRSS),
+  computeCapacityDesign (plastic hinge: Mpo=λo·Mp, Vpo, Lp Priestley, Δy, Δp, ΔC,
+  μΔ, P-Δ ≤0.25Mp), computeLiquefaction (Seed–Idriss/Youd: CSR, (N1)60cs, CRR7.5,
+  MSF, FS). Standards: AASHTO Guide Spec LRFD Seismic / Caltrans SDC / Priestley
+  DBD / SNI 2833 (books 219–229, files not yet present → built from procedure).
+  DISTINCT from seismic.ts (single-mode), sni2833seismic.ts (spectrum),
+  foundationdynamics.ts (machine/SSI). Tab 🌋. Wired into the foundation.enabled
+  checkbox → report §31. Trigger on dynamic analysis, modal, SRSS, capacity
+  design, plastic hinge, ductility, P-Δ, liquefaction, pushover, seismic pier.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+SDOF: m=W/g ; ω=√(K/m) ; T=2π/ω ; B=√(0.10/(0.05+ζ)) ; V=Sa·B·W ; Sd=Sa·g/ω²
+MODAL 2-DOF: M=diag(m1,m2), K=[[k1+k2,-k2],[-k2,k2]] ; solve λ=ω² quadratic ;
+  φ shapes (φ1=1) ; Γ=L*/M* ; SRSS V=√(ΣVk²), Vk=Sa_k·g·Meff_k
+CAPACITY: Mpo=λo·Mp ; Vpo=Mpo/H (cant) or 2Mpo/H (fixed) ; Lp=0.08L+0.022fye·dbl ;
+  Δy=φy·L²/3 ; θp=(φu−φy)Lp ; Δp=θp(L−Lp/2) ; ΔC=Δy+Δp ; μΔ=ΔC/Δy ;
+  check Δ_D≤ΔC and P-Δ Pdl·Δ≤0.25Mp
+LIQUEFACTION: σ'v=σv−u ; rd=1−0.00765z (≤9.15m) ; CSR=0.65·amax·(σv/σ'v)·rd ;
+  (N1)60cs fines-corrected ; CRR7.5 (Youd curve) ; MSF (Idriss) ; FS=CRR·MSF/CSR
+REPORT WIRING: foundation.enabled → pierK=3EI/H³ → SDOF Sd = Δ_D → capacity ;
+  liquefaction from foundation soil ; render report §31. NOTE: PDF numbers never
+  a code reference — procedure only.
+```
