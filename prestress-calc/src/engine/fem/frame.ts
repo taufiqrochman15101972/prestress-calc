@@ -10,7 +10,8 @@
  * Pairs with fem/core.ts (solver) and fem/model.ts (pre-processor).
  * Units SI: E,G MPa; A mm²; I mm⁴; L mm; w N/mm; forces N, moments N·mm.
  */
-import { solveLinear, scatter, matVec, matMul, transpose } from "./core";
+import { scatter, matVec, matMul, transpose } from "./core";
+import { solve as solveLinear } from "./backend";
 
 export interface FemNode { id: number; x: number; y: number; }
 export interface FemMember {

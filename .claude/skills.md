@@ -1434,3 +1434,35 @@ PLATE solve: mesh nx×ny Q4 plateK (3 DOF/node) ; load −q·Ae/4 → w DOF (dow
   BC SS w=0 / clamped w=θ=0 penalty ; theory w=α·q·a⁴/D (SS 0.00406, clamp 0.00126)
   ; ratio→1 confirms convergence & no shear locking (test thin t/a=1/200 too).
 ```
+
+---
+
+## Skill: fem-3d-backend-straincompat (3D frame, solver seam, strain compatibility)
+
+```
+name: fem-3d-backend-straincompat
+description: >
+  3D space frame FEM (engine/fem/frame3d.ts, 6 DOF/node axial+torsion+biaxial
+  bending, tab 🧊), pluggable solver backend seam (engine/fem/backend.ts —
+  SolverBackend.solve over Float64Array zero-copy; native Julia/Zig swaps in
+  without UI change), and strain-compatibility ULS (engine/straincompat.ts,
+  Naaman, tab 🎚 — layered NA search, f_ps from real σ–ε, full & partial
+  prestressing). Trigger on: 3D frame, space frame, 6 DOF, torsion member,
+  solver backend/native swap, strain compatibility, layered section, f_ps exact.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+FRAME3D local 12×12: axial EA/L (0,6); torsion GJ/L (3,9); bend-z EIz on v,θz
+  (1,5,7,11); bend-y EIy on w,θy (2,4,8,10). T=blockdiag(R×4), R rows=ex,ey,ez
+  (ex=axis; up=Z unless vertical then Y; ey=up×ex; ez=ex×ey). Validate cantilever
+  PL³/3EIz & /3EIy, torsion TL/GJ, axial PL/EA.
+BACKEND seam: every solver calls solve(K,n,F) from backend.ts (default denseLU).
+  setSolverBackend(native) later; keep (K,n,F) as Float64Array (pointer/zero-copy).
+STRAIN-COMPAT: bisection on c; layer ε=εcu(d−c)/c (PS add f_se/E_ps prestrain);
+  f from σ–ε (PS bilinear+hardening cap fpu; RC ±fy); g(c)=Cc−ΣT (0.85f'c·b·a);
+  Mn=ΣT·d−Cc·a/2; εt extreme → phiFromStrain. Works full (A_ps) & partial (+A_s).
+```

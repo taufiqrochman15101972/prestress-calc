@@ -5,6 +5,8 @@ import { membraneK, plateK, flatShellK } from "@/engine/fem/shell";
 import { computeBeamFieldsFEM } from "@/engine/fem/beamfields";
 import { computeBeamFields, type BeamFieldInputs } from "@/engine/internalforces";
 import { solvePlate } from "@/engine/fem/plate";
+import { solveFrame3D, type Frame3DModel } from "@/engine/fem/frame3d";
+import { computeStrainCompatibility, type SteelLayer } from "@/engine/straincompat";
 
 const E = 200000, b = 200, h = 400, A = b * h, I = (b * h ** 3) / 12;
 
@@ -114,6 +116,62 @@ describe("📊 fields via FEM solver ≈ closed-form", () => {
   test("axial N carried as prestress compression", () => {
     const fem = computeBeamFieldsFEM(fin);
     expect(fem.pts[10].N).toBeCloseTo(-fin.Plong, 3);
+  });
+});
+
+describe("3D space frame (#3) — closed-form validation", () => {
+  const E3 = 200000, G3 = 80000, A3 = 80000, Iy3 = 1.067e9, Iz3 = 2.5e9, J3 = 1.5e9;
+  const mk = (loads: Frame3DModel["loads"]): Frame3DModel => ({
+    nodes: [{ id: 1, x: 0, y: 0, z: 0 }, { id: 2, x: 5000, y: 0, z: 0 }],
+    members: [{ id: 1, n1: 1, n2: 2, E: E3, G: G3, A: A3, Iy: Iy3, Iz: Iz3, J: J3 }],
+    supports: [{ node: 1, dofs: [true, true, true, true, true, true] }],
+    loads,
+  });
+  const L = 5000, P = 10000;
+  test("cantilever load in Y: uy = −PL³/3EIz", () => {
+    const r = solveFrame3D(mk([{ node: 2, fy: -P }]));
+    expect(r.disp[1].uy).toBeCloseTo(-(P * L ** 3) / (3 * E3 * Iz3), 2);
+  });
+  test("cantilever load in Z: uz = −PL³/3EIy", () => {
+    const r = solveFrame3D(mk([{ node: 2, fz: -P }]));
+    expect(r.disp[1].uz).toBeCloseTo(-(P * L ** 3) / (3 * E3 * Iy3), 2);
+  });
+  test("axial: ux = PL/EA", () => {
+    const r = solveFrame3D(mk([{ node: 2, fx: P }]));
+    expect(r.disp[1].ux).toBeCloseTo((P * L) / (E3 * A3), 4);
+  });
+  test("torsion: rx = T·L/GJ", () => {
+    const Tq = 5e6;
+    const r = solveFrame3D(mk([{ node: 2, mx: Tq }]));
+    expect(r.disp[1].rx).toBeCloseTo((Tq * L) / (G3 * J3), 4);
+  });
+  test("vertical column carries axial along global Z", () => {
+    const m: Frame3DModel = {
+      nodes: [{ id: 1, x: 0, y: 0, z: 0 }, { id: 2, x: 0, y: 0, z: 4000 }],
+      members: [{ id: 1, n1: 1, n2: 2, E: E3, G: G3, A: A3, Iy: Iy3, Iz: Iz3, J: J3 }],
+      supports: [{ node: 1, dofs: [true, true, true, true, true, true] }],
+      loads: [{ node: 2, fz: -P }],
+    };
+    const r = solveFrame3D(m);
+    expect(r.disp[1].uz).toBeCloseTo(-(P * 4000) / (E3 * A3), 4);
+  });
+});
+
+describe("Strain-compatibility ULS (Naaman) — full & partial", () => {
+  const psLayer: SteelLayer = { kind: "PS", A: 3553, d: 1500, Eps: 197000, fpu: 1860, fpy: 1674, epsPE: 1150 / 197000 };
+  test("full prestressed: equilibrium converges, tension-controlled, f_ps ≤ f_pu", () => {
+    const r = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer] });
+    expect(r.converged).toBe(true);
+    expect(r.c).toBeGreaterThan(0);
+    expect(r.c).toBeLessThan(1650);
+    expect(Math.abs(r.Cc - r.layers.reduce((s, l) => s + l.force, 0))).toBeLessThan(50); // ΣT = Cc
+    expect(r.layers[0].stress).toBeLessThanOrEqual(1860 + 1e-6);
+    expect(r.phiMn).toBeGreaterThan(0);
+  });
+  test("adding mild steel (partial) raises M_n", () => {
+    const full = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer] });
+    const partial = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer, { kind: "RC", A: 2000, d: 1560, Es: 200000, fy: 420 }] });
+    expect(partial.Mn).toBeGreaterThan(full.Mn);
   });
 });
 

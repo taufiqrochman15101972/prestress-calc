@@ -7,7 +7,8 @@
  * Units SI: a,b,t mm; E MPa; q N/mm² (pressure); w mm.
  */
 import { plateK } from "./shell";
-import { solveLinear, scatter } from "./core";
+import { scatter } from "./core";
+import { solve as solveLinear } from "./backend";
 
 export interface PlateInputs {
   a: number; b: number;       // plan dimensions, mm

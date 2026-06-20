@@ -44,8 +44,10 @@ import { DxfImportCalculator } from "@/components/DxfImportCalculator";
 import { ForceDiagramsCalculator } from "@/components/ForceDiagramsCalculator";
 import { FemModelerCalculator } from "@/components/FemModelerCalculator";
 import { PlateFemCalculator } from "@/components/PlateFemCalculator";
+import { Frame3DCalculator } from "@/components/Frame3DCalculator";
+import { StrainCompatCalculator } from "@/components/StrainCompatCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat";
 
 interface Props {
   open: boolean;
@@ -288,6 +290,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Ekosistem FEM/FEA — Pre-processor (node/member/mesh + 3 cara copy: linear/mirror/rotate), Solver Core (elemen balok-kolom 2D aksial+geser+lentur, solver Float64Array zero-copy), Post-processor (lendutan, diagram N/V/M). Elemen flat-shell Mindlin-SRI bebas shear-locking di pustaka elemen. Target Phase-2: Python(GUI)+Julia(solver)+Zig(memori) native",
   },
   {
+    key: "fem3d",
+    emoji: "🧊",
+    title: "Rangka Ruang 3D (FEM)",
+    subtitle: "Elemen balok-kolom 3D 6-DOF/node (aksial + torsi GJ + lentur EIy & EIz), transformasi 3 sumbu, solve & lendutan + gaya batang N/Vy/Vz/T/My/Mz. Tampilan isometrik X→kanan/Y→depan/Z→atas. Divalidasi vs rumus tertutup",
+  },
+  {
+    key: "straincompat",
+    emoji: "🎚",
+    title: "Kompatibilitas Regangan ULS",
+    subtitle: "Analisis lentur ultimit dgn kompatibilitas regangan berlapis (Naaman) — cari garis netral c dari regangan riil, f_ps dari kurva tegangan-regangan tendon, berlaku prategang PENUH & SEBAGIAN, kontrol regangan εt→φ. Melengkapi/validasi tab ULS aproksimasi",
+  },
+  {
     key: "plate",
     emoji: "▦",
     title: "Pelat/Shell FEM",
@@ -395,6 +409,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "fem3d" && "Rangka ruang 3D (#3) — elemen balok-kolom 3D 2-node 6 DOF/node (u,v,w,θx,θy,θz): aksial EA/L + torsi GJ/L + lentur dua sumbu EIy & EIz, matriks lokal 12×12, transformasi 3 sumbu (direction cosine + up-vector otomatis). Solve via seam backend (Float64Array zero-copy). Tampilan ISOMETRIK X→kanan/Y→depan/Z→atas + triad + lendutan. Divalidasi vs rumus tertutup (kantilever PL³/3EIz & PL³/3EIy, torsi TL/GJ, aksial PL/EA, kolom vertikal)."}
+          {tab === "straincompat" && "Analisis lentur ultimit dgn KOMPATIBILITAS REGANGAN berlapis (Naaman, PCI J. — buku 249) + ACI/AASHTO. Garis netral c dicari dari regangan riil tiap lapis (εcu=0,003), tegangan tendon f_ps dari kurva σ–ε aktual (bukan rumus aproksimasi), regangan tendon = prategang efektif f_se/E_ps + tambahan kompatibilitas. Berlaku sama untuk prategang PENUH (hanya A_ps) & SEBAGIAN (A_ps + A_s), kontrol regangan εt→φ. Melengkapi & memvalidasi tab ULS utama."}
           {tab === "plate" && "Pelat/Shell FEM — meshing rektangular nx×ny dgn elemen Q4 Mindlin-Reissner Selective Reduced Integration (lentur 2×2 Gauss, geser 1-titik tereduksi → BEBAS SHEAR LOCKING). Tepi simply-supported (w=0) atau clamped (w=θ=0), tekanan merata q → solve medan lendutan w(x,y), permukaan lendutan isometrik berwarna (X→kanan, Y→depan, Z=w→atas). Divalidasi vs teori pelat tipis (SS α=0,00406, jepit α=0,00126; rasio→1 saat mesh rapat)."}
           {tab === "fem" && "Ekosistem FEM/FEA (TypeScript, zero-copy Float64Array — pondasi yang siap ditingkatkan ke Python+Julia+Zig native). Pre-processor: tabel node/member gaya STAAD.Pro + 3 cara copy/paste (1 linear repeat/translasi, 2 mirror/cermin, 3 rotate/circular). Solver Core: elemen balok-kolom 2D 2-node 3-DOF (aksial EA/L + lentur + geser Timoshenko bebas shear-locking), perakitan global, BC penalti, solve LU. Post-processor: bentuk lendutan (Hermite), diagram N/V/M, reaksi. Pustaka elemen juga memuat flat-shell Q4 (membran + pelat Mindlin Selective-Reduced-Integration → bebas shear locking, terbukti energi geser nol pada lentur murni). Divalidasi vs rumus tertutup (kantilever P·L³/3EI, SS PL³/48EI & 5wL⁴/384EI, aksial PL/EA)."}
           {tab === "forces" && "Diagram Gaya Dalam, Tegangan & Lendutan (gaya OriginPro / IDEA StatiCa / Robot / MIDAS) — momen utama M_z, momen lateral M_y, geser V_x/V_y, aksial N (tarik +/tekan −), torsi T_x, lendutan ±Z & ±Y. Kurva terisi gradien warna jet real-time saat dicentang; klik di bentang (0–L) → gaya dalam, klik tinggi penampang (−yb…+yt) → tegangan σ (Navier = N/A−M·y/I & kernel = P/A(1∓ey/r²)∓My/I, ekuivalen) + lendutan. Berbasis kesetimbangan mekanika bahan lanjut (pre-FEM), disiapkan untuk peningkatan bertahap ke FEM/FEA."}
@@ -445,6 +461,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "forces" && <ForceDiagramsCalculator />}
           {tab === "fem" && <FemModelerCalculator />}
           {tab === "plate" && <PlateFemCalculator />}
+          {tab === "fem3d" && <Frame3DCalculator />}
+          {tab === "straincompat" && <StrainCompatCalculator />}
           {tab === "snieq" && <SeismicSNICalculator />}
           {tab === "cable" && <CableStayedCalculator />}
           {tab === "truss" && <SteelTrussCalculator />}
