@@ -114,27 +114,28 @@ export function solveFrame(model: FrameModel): FrameResult {
     cache.push({ m, L, c, s, T, kl, map, w });
   }
 
-  // boundary conditions (penalty on supported DOFs)
+  // boundary conditions (penalty on a COPY; keep pure K & F for reaction recovery)
   const BIG = 1e30;
   const fixed = new Set<number>();
   for (const sp of supports) {
     const b = (idx.get(sp.node) ?? 0) * 3;
     if (sp.ux) fixed.add(b); if (sp.uy) fixed.add(b + 1); if (sp.rz) fixed.add(b + 2);
   }
-  for (const dof of fixed) { K[dof * ndof + dof] += BIG; F[dof] = 0; }
+  const Ksolve = K.slice(), Fsolve = F.slice();
+  for (const dof of fixed) { Ksolve[dof * ndof + dof] += BIG; Fsolve[dof] = 0; }
 
-  const d = solveLinear(K, ndof, F);
+  const d = solveLinear(Ksolve, ndof, Fsolve);
 
-  // reactions: R = K_orig·d − F_applied (use original K without penalty → recompute)
-  // simpler: reaction at fixed dof = penalty·d ≈ K_big·d
+  // reactions R = K_pure·d − F  (exact even when a load sits on a support)
+  const reactDof = (dof: number) => { let s = 0; for (let j = 0; j < ndof; j++) s += K[dof * ndof + j] * d[j]; return s - F[dof]; };
   const reactions: { node: number; fx: number; fy: number; mz: number }[] = [];
   for (const sp of supports) {
     const b = (idx.get(sp.node) ?? 0) * 3;
     reactions.push({
       node: sp.node,
-      fx: sp.ux ? BIG * d[b] : 0,
-      fy: sp.uy ? BIG * d[b + 1] : 0,
-      mz: sp.rz ? BIG * d[b + 2] : 0,
+      fx: sp.ux ? reactDof(b) : 0,
+      fy: sp.uy ? reactDof(b + 1) : 0,
+      mz: sp.rz ? reactDof(b + 2) : 0,
     });
   }
 

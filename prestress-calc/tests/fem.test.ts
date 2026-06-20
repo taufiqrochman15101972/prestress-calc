@@ -7,6 +7,7 @@ import { computeBeamFields, type BeamFieldInputs } from "@/engine/internalforces
 import { solvePlate } from "@/engine/fem/plate";
 import { solveFrame3D, type Frame3DModel } from "@/engine/fem/frame3d";
 import { computeStrainCompatibility, type SteelLayer } from "@/engine/straincompat";
+import { computeInfluenceLine } from "@/engine/fem/influence";
 
 const E = 200000, b = 200, h = 400, A = b * h, I = (b * h ** 3) / 12;
 
@@ -172,6 +173,25 @@ describe("Strain-compatibility ULS (Naaman) — full & partial", () => {
     const full = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer] });
     const partial = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer, { kind: "RC", A: 2000, d: 1560, Es: 200000, fy: 420 }] });
     expect(partial.Mn).toBeGreaterThan(full.Mn);
+  });
+});
+
+describe("Influence line / moving load (MIDAS-style, MD1)", () => {
+  const L = 30000;
+  const r = computeInfluenceLine({ spans: 1, L, E: 200000, A: 535000, I: 1.77e11, perSpan: 12 });
+  test("R_left influence: 1 at left support, ~0.5 at mid, 0 at right", () => {
+    expect(r.line[0].R0).toBeCloseTo(1, 2);
+    expect(r.line[r.line.length - 1].R0).toBeCloseTo(0, 2);
+    const mid = r.line.reduce((b, p) => Math.abs(p.x - L / 2) < Math.abs(b.x - L / 2) ? p : b);
+    expect(mid.R0).toBeCloseTo(0.5, 2);
+  });
+  test("M_mid influence peaks ≈ L/4 with unit load at mid", () => {
+    const mid = r.line.reduce((b, p) => Math.abs(p.x - L / 2) < Math.abs(b.x - L / 2) ? p : b);
+    expect(Math.abs(mid.Mmid)).toBeCloseTo(L / 4, -1);
+  });
+  test("moving 2-axle vehicle gives a positive mid-moment envelope", () => {
+    const rv = computeInfluenceLine({ spans: 1, L, E: 200000, A: 535000, I: 1.77e11, perSpan: 12, axles: [{ P: 145000, dx: 0 }, { P: 145000, dx: 4300 }] });
+    expect(Math.abs(rv.env.MmidMax)).toBeGreaterThan(0);
   });
 });
 

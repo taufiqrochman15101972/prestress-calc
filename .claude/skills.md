@@ -1466,3 +1466,32 @@ STRAIN-COMPAT: bisection on c; layer ε=εcu(d−c)/c (PS add f_se/E_ps prestrai
   f from σ–ε (PS bilinear+hardening cap fpu; RC ±fy); g(c)=Cc−ΣT (0.85f'c·b·a);
   Mn=ΣT·d−Cc·a/2; εt extreme → phiFromStrain. Works full (A_ps) & partial (+A_s).
 ```
+
+---
+
+## Skill: influence-moving-load (MIDAS-style)
+
+```
+name: influence-moving-load
+description: >
+  Influence-line & moving-load analysis (engine/fem/influence.ts, tab 📉) — unit
+  load traversed via the FEM solver → influence lines for R₀/M_mid/V_mid; multi-
+  axle vehicle slid → max/min envelope + critical position. MIDAS/Civil-style
+  (ref MD-1). Also: frame.ts reaction recovery R=K_pure·d−F (exact). Trigger on:
+  influence line, moving load, vehicle envelope, Müller-Breslau, reaction recovery.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+INFLUENCE: build N-element beam (1 or 2 equal spans, rollers at boundaries, left
+  pinned). For each node: apply unit fy=-1, solveFrame, read R₀ (left reaction),
+  M_mid (mid member M2), V_mid → IL ordinate. Validate IL(R₀)=1 at support,
+  0.5 at mid, 0 at far end; IL(M_mid)=L/4 at mid (SS).
+MOVING LOAD: interpolate IL(x); slide axle group (P,dx), response=ΣP·IL(x_axle);
+  track max/min + critical lead position.
+REACTION (frame.ts): solve on penalty COPY (Ksolve/Fsolve); reactions from PURE
+  K & F → R=Σ K[dof][j]·d[j] − F[dof] (exact even with load on a support).
+```
