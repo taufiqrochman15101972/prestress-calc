@@ -18,6 +18,7 @@ import { describe, test, expect } from "vitest";
 import { calculateGrossProperties, calculateCompositeProperties } from "@/engine/section";
 import { computeFlexuralStrength } from "@/engine/uls";
 import { computeSLSChecks } from "@/engine/sls";
+import { GIRDER_PRESETS } from "@/lib/presets";
 import type { ULSFlexInputs } from "@/engine/uls";
 
 // ─── Benchmark input ─────────────────────────────────────────
@@ -232,5 +233,33 @@ describe("Engine Internal Consistency", () => {
   test("Adding deck raises composite centroid above girder centroid", () => {
     const comp = calculateCompositeProperties(GIRDER, DECK);
     expect(comp.ybc).toBeGreaterThan(g1.yb);
+  });
+});
+
+describe("Girder Profile Database — every stored profile is computable", () => {
+  test("All presets yield positive, physically-sane gross properties", () => {
+    for (const p of GIRDER_PRESETS) {
+      const g = calculateGrossProperties(p.girder);
+      const H = p.girder.h1 + p.girder.h2 + p.girder.h3;
+      expect(g.areaAg, p.id).toBeGreaterThan(0);
+      expect(g.momentOfInertiaIg, p.id).toBeGreaterThan(0);
+      // centroid must lie within the section height
+      expect(g.yb, p.id).toBeGreaterThan(0);
+      expect(g.yb, p.id).toBeLessThan(H);
+    }
+  });
+
+  test("New standard families are present (segmental box + Texas U)", () => {
+    const ids = GIRDER_PRESETS.map(p => p.id);
+    expect(ids).toContain("seg_box1800");
+    expect(ids).toContain("seg_box3000");
+    expect(ids).toContain("pcu_txu40");
+    expect(ids).toContain("pcu_txu54");
+  });
+
+  test("Segmental box depth ladder increases monotonically", () => {
+    const seg = GIRDER_PRESETS.filter(p => p.category === "SEG_BOX")
+      .map(p => calculateGrossProperties(p.girder).areaAg);
+    for (let i = 1; i < seg.length; i++) expect(seg[i]).toBeGreaterThan(seg[i - 1]);
   });
 });

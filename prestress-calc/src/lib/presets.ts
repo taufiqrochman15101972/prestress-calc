@@ -14,7 +14,7 @@ export type PresetCategory =
   | "CUSTOM" | "WIKA_WF" | "AASHTO_I" | "PCI_BT" | "PCI_I"
   | "NU" | "CPCI"
   | "DECK_BULB_T" | "DOUBLE_T" | "PC_U" | "VOIDED_SLAB" | "BOX"
-  | "AASHTO_BOX";
+  | "AASHTO_BOX" | "SEG_BOX";
 
 export interface GirderPreset {
   id: string;
@@ -38,6 +38,7 @@ export const CATEGORY_LABEL: Record<PresetCategory, string> = {
   VOIDED_SLAB: "Voided Slab",
   BOX: "Box / Spread-Box Beam",
   AASHTO_BOX: "AASHTO Box Beam BI–BIV (ekuivalen-I)",
+  SEG_BOX: "Segmental Box (AASHTO-PCI-ASBI, ekuivalen-I)",
 };
 
 export const GIRDER_PRESETS: GirderPreset[] = [
@@ -159,6 +160,13 @@ export const GIRDER_PRESETS: GirderPreset[] = [
     girder: { b1: 1200, h1: 180, h5: 120, b2: 350, h2: 1220, h4: 0, b3: 1700, h3: 180 } },
   { id: "pcu_2000", name: "PC-U 2000", category: "PC_U", spanRange: "32–45 m",
     girder: { b1: 1400, h1: 200, h5: 140, b2: 400, h2: 1460, h4: 0, b3: 2000, h3: 200 } },
+  // Texas U-Beam standard tub (TxDOT / PCI Zone-6 U-girders, book 171): two
+  // sloped webs (Σ≈356), 96-in top opening, 55-in bottom slab; idealised as a
+  // single-web trough like the PC-U entries. U40 = 1016 mm, U54 = 1372 mm deep.
+  { id: "pcu_txu40", name: "Texas U40 (tub)", category: "PC_U", spanRange: "20–30 m",
+    girder: { b1: 2438, h1: 90, h5: 120, b2: 356, h2: 726, h4: 0, b3: 1397, h3: 200 } },
+  { id: "pcu_txu54", name: "Texas U54 (tub)", category: "PC_U", spanRange: "28–40 m",
+    girder: { b1: 2438, h1: 90, h5: 120, b2: 356, h2: 1082, h4: 0, b3: 1397, h3: 200 } },
 
   // ── Voided slab (solid-slab idealisation with side bevels) ──
   { id: "vs_600", name: "Voided Slab 600", category: "VOIDED_SLAB", spanRange: "8–15 m",
@@ -192,6 +200,25 @@ export const GIRDER_PRESETS: GirderPreset[] = [
     girder: { b1: 914, h1: 104, h5: 76, b2: 254, h2: 707, h4: 76, b3: 914, h3: 104 } },
   { id: "abox_biv48", name: "AASHTO BIV-48", category: "AASHTO_BOX", spanRange: "≤ 39 m",
     girder: { b1: 1219, h1: 103, h5: 76, b2: 254, h2: 709, h4: 76, b3: 1219, h3: 103 } },
+
+  // ── AASHTO-PCI-ASBI Segmental Box Girder Standards (book 162) ──
+  //   Single-cell precast segmental box: 225 mm top/bottom slabs, two webs
+  //   (≈350–400 each → b2 ≈ 750–800), bottom slab ≈5400 between webs, top
+  //   structural width (between cantilever-wing roots) ≈6000. Depth follows
+  //   the standard's 300-mm ladder from 1800 (span 30.5 m, +300 per +6 m).
+  //   Span-by-Span 30.5–45.7 m; Balanced Cantilever 30.5–61.0 m (deeper).
+  //   Idealised single-web trapezoid like BOX/AASHTO_BOX (true closed-cell
+  //   torsion/J → 🌉 Box Girder tab; erection → 🏗 Segmental tab).
+  { id: "seg_box1800", name: "Segmental Box H-1800 (span-by-span)", category: "SEG_BOX", spanRange: "30–37 m",
+    girder: { b1: 6000, h1: 225, h5: 100, b2: 800, h2: 1350, h4: 150, b3: 5400, h3: 225 } },
+  { id: "seg_box2100", name: "Segmental Box H-2100 (span-by-span)", category: "SEG_BOX", spanRange: "36–43 m",
+    girder: { b1: 6000, h1: 225, h5: 100, b2: 800, h2: 1650, h4: 150, b3: 5400, h3: 225 } },
+  { id: "seg_box2400", name: "Segmental Box H-2400 (span-by-span)", category: "SEG_BOX", spanRange: "42–46 m",
+    girder: { b1: 6000, h1: 225, h5: 100, b2: 800, h2: 1950, h4: 150, b3: 5400, h3: 225 } },
+  { id: "seg_box2700", name: "Segmental Box H-2700 (balanced cant.)", category: "SEG_BOX", spanRange: "46–54 m",
+    girder: { b1: 6000, h1: 250, h5: 100, b2: 800, h2: 2200, h4: 175, b3: 5400, h3: 250 } },
+  { id: "seg_box3000", name: "Segmental Box H-3000 (balanced cant.)", category: "SEG_BOX", spanRange: "52–61 m",
+    girder: { b1: 6000, h1: 250, h5: 100, b2: 800, h2: 2500, h4: 175, b3: 5400, h3: 250 } },
 ];
 
 export function findPreset(id: string): GirderPreset | undefined {
