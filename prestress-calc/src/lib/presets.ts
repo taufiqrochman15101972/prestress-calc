@@ -14,7 +14,7 @@ export type PresetCategory =
   | "CUSTOM" | "WIKA_WF" | "AASHTO_I" | "PCI_BT" | "PCI_I"
   | "NU" | "CPCI"
   | "DECK_BULB_T" | "DOUBLE_T" | "PC_U" | "VOIDED_SLAB" | "BOX"
-  | "AASHTO_BOX" | "SEG_BOX";
+  | "AASHTO_BOX" | "SEG_BOX" | "AASHTO_SLAB";
 
 export interface GirderPreset {
   id: string;
@@ -39,6 +39,7 @@ export const CATEGORY_LABEL: Record<PresetCategory, string> = {
   BOX: "Box / Spread-Box Beam",
   AASHTO_BOX: "AASHTO Box Beam BI–BIV (ekuivalen-I)",
   SEG_BOX: "Segmental Box (AASHTO-PCI-ASBI, ekuivalen-I)",
+  AASHTO_SLAB: "AASHTO Solid/Voided Slab Beam SI–SIV (ekuivalen-I)",
 };
 
 export const GIRDER_PRESETS: GirderPreset[] = [
@@ -219,6 +220,29 @@ export const GIRDER_PRESETS: GirderPreset[] = [
     girder: { b1: 6000, h1: 250, h5: 100, b2: 800, h2: 2200, h4: 175, b3: 5400, h3: 250 } },
   { id: "seg_box3000", name: "Segmental Box H-3000 (balanced cant.)", category: "SEG_BOX", spanRange: "52–61 m",
     girder: { b1: 6000, h1: 250, h5: 100, b2: 800, h2: 2500, h4: 175, b3: 5400, h3: 250 } },
+
+  // ── AASHTO Solid & Voided Slab Beams SI–SIV (PCI BDM Appendix B, book 192) ──
+  //   Adjacent precast slab beams, width W = 36 in (914) or 48 in (1219).
+  //   SI = solid (b1=b2=b3=W → full rectangle); SII–SIV = voided (full-width
+  //   top/bottom slab covers + a net-solid middle "web" b2 ≈ 0.45·W around the
+  //   round voids). Idealised single-web trapezoid like VOIDED_SLAB. Depths
+  //   H = 12/15/18/21 in (305/381/457/533). Short-span adjacent decks.
+  { id: "aslab_si36", name: "AASHTO SI-36 (solid, 305)", category: "AASHTO_SLAB", spanRange: "6–11 m",
+    girder: { b1: 914, h1: 100, h5: 0, b2: 914, h2: 105, h4: 0, b3: 914, h3: 100 } },
+  { id: "aslab_sii36", name: "AASHTO SII-36 (voided, 381)", category: "AASHTO_SLAB", spanRange: "9–14 m",
+    girder: { b1: 914, h1: 85, h5: 0, b2: 410, h2: 211, h4: 0, b3: 914, h3: 85 } },
+  { id: "aslab_siii36", name: "AASHTO SIII-36 (voided, 457)", category: "AASHTO_SLAB", spanRange: "12–17 m",
+    girder: { b1: 914, h1: 100, h5: 0, b2: 410, h2: 257, h4: 0, b3: 914, h3: 100 } },
+  { id: "aslab_siv36", name: "AASHTO SIV-36 (voided, 533)", category: "AASHTO_SLAB", spanRange: "15–20 m",
+    girder: { b1: 914, h1: 115, h5: 0, b2: 410, h2: 303, h4: 0, b3: 914, h3: 115 } },
+  { id: "aslab_si48", name: "AASHTO SI-48 (solid, 305)", category: "AASHTO_SLAB", spanRange: "6–11 m",
+    girder: { b1: 1219, h1: 100, h5: 0, b2: 1219, h2: 105, h4: 0, b3: 1219, h3: 100 } },
+  { id: "aslab_sii48", name: "AASHTO SII-48 (voided, 381)", category: "AASHTO_SLAB", spanRange: "9–14 m",
+    girder: { b1: 1219, h1: 85, h5: 0, b2: 550, h2: 211, h4: 0, b3: 1219, h3: 85 } },
+  { id: "aslab_siii48", name: "AASHTO SIII-48 (voided, 457)", category: "AASHTO_SLAB", spanRange: "12–17 m",
+    girder: { b1: 1219, h1: 100, h5: 0, b2: 550, h2: 257, h4: 0, b3: 1219, h3: 100 } },
+  { id: "aslab_siv48", name: "AASHTO SIV-48 (voided, 533)", category: "AASHTO_SLAB", spanRange: "15–20 m",
+    girder: { b1: 1219, h1: 115, h5: 0, b2: 550, h2: 303, h4: 0, b3: 1219, h3: 115 } },
 ];
 
 export function findPreset(id: string): GirderPreset | undefined {

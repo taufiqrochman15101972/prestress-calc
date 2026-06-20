@@ -255,6 +255,16 @@ describe("Girder Profile Database — every stored profile is computable", () =>
     expect(ids).toContain("seg_box3000");
     expect(ids).toContain("pcu_txu40");
     expect(ids).toContain("pcu_txu54");
+    expect(ids).toContain("aslab_si36");
+    expect(ids).toContain("aslab_siv48");
+  });
+
+  test("AASHTO solid slab beam is heavier (more area) than its voided peer", () => {
+    const solid = calculateGrossProperties(
+      GIRDER_PRESETS.find(p => p.id === "aslab_si48")!.girder).areaAg;
+    const voided = calculateGrossProperties(
+      GIRDER_PRESETS.find(p => p.id === "aslab_sii48")!.girder).areaAg;
+    expect(solid).toBeGreaterThan(voided);
   });
 
   test("Segmental box depth ladder increases monotonically", () => {
