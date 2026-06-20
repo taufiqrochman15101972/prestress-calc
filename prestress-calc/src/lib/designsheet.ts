@@ -194,6 +194,24 @@ export function designSheetSVG(inputs: ProjectInputs, r: DesignResults): string 
     `<polygon points="${xc - 6},${girBotY + 12} ${xc + 6},${girBotY + 12} ${xc},${girBotY + 2}" fill="#cbd5e1" stroke="#475569" stroke-width="0.8"/>` +
     `<line x1="${xc - 9}" y1="${girBotY + 12}" x2="${xc + 9}" y2="${girBotY + 12}" stroke="#475569" stroke-width="1"/>`;
   const endZoneW = Math.min(bw2 * 0.06, 22);
+  // Diaphragm placement (penempatan diafragma tepi & tengah) — DED practice
+  // (e.g. Suramadu PCI girder: diafragma tepi di tumpuan + diafragma tengah
+  // dengan spasi ≈ 7 m). Intermediate count from span; drawn as hatched bars.
+  const nSeg = Math.max(2, Math.min(8, Math.round(loads.spanLength / 7000)));
+  const nDiaphMid = nSeg - 1;
+  let diaphragmMarks = "";
+  for (let k = 1; k <= nDiaphMid; k++) {
+    const dx = bx + (bw2 * k) / nSeg;
+    diaphragmMarks +=
+      `<rect x="${(dx - 1.6).toFixed(1)}" y="${girTopY}" width="3.2" height="${(hG * eyScale).toFixed(1)}" fill="#5eead4" fill-opacity="0.55" stroke="#0d9488" stroke-width="0.6"/>`;
+  }
+  // edge diaphragms (diafragma tepi) at the support faces
+  const edgeDx = [bx + endZoneW / 2, bx + bw2 - endZoneW / 2];
+  for (const dx of edgeDx)
+    diaphragmMarks += `<rect x="${(dx - 1.8).toFixed(1)}" y="${girTopY}" width="3.6" height="${(hG * eyScale).toFixed(1)}" fill="#2dd4bf" fill-opacity="0.5" stroke="#0d9488" stroke-width="0.7"/>`;
+  const diaphLabel = txt(bx + bw2 / 2, girTopY - 12,
+    `DIAFRAGMA: 2 tepi + ${nDiaphMid} tengah (spasi ≈ ${f(loads.spanLength / nSeg / 1000, 2)} m)`,
+    { size: 6.5, anchor: "middle", fill: "#0d9488" });
   const zoneB = `
     ${txt(bx, 50, `B — PROFIL TENDON PASCA-TARIK / TAMPAK SAMPING (${layout.nTendons} × tendon-${layout.unitSize}, ${tendon.profileType})`, { size: 9.5, w: 700, fill: "#1d4ed8" })}
     <rect x="${bx}" y="${girTopY}" width="${bw2}" height="${hG * eyScale}" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.1"/>
@@ -202,6 +220,8 @@ export function designSheetSVG(inputs: ProjectInputs, r: DesignResults): string 
     ${txt(bx + endZoneW / 2, girTopY - 2, "blok ujung", { size: 6.5, anchor: "middle", fill: "#1d4ed8" })}
     <line x1="${bx}" y1="${cgY}" x2="${bx + bw2}" y2="${cgY}" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="4 3"/>
     ${txt(bx + bw2 + 4, cgY + 3, "cgc", { size: 7.5, fill: "#64748b" })}
+    ${diaphragmMarks}
+    ${diaphLabel}
     ${tendonPaths}
     <rect x="${bx - 7}" y="${cgY - 9}" width="7" height="18" fill="#cbd5e1" stroke="#475569" stroke-width="0.8"/>
     <rect x="${bx + bw2}" y="${cgY - 9}" width="7" height="18" fill="#cbd5e1" stroke="#475569" stroke-width="0.8"/>
