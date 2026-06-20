@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from "react";
 import { solveFrame, type FrameModel, type FemNode, type FemMember } from "@/engine/fem/frame";
 import { linearRepeat, mirror, rotateCopy, deflectedShape } from "@/engine/fem/model";
+import { checkSteelMember } from "@/engine/fem/designcheck";
+import { solveFramePDelta } from "@/engine/fem/pdelta";
 
 // ── default portal frame (STAAD-like: page opens pre-filled, not blank) ──
 const DEFAULT: FrameModel = {
@@ -27,10 +29,17 @@ export function FemModelerCalculator() {
   // copy controls
   const [cp, setCp] = useState({ method: "linear" as "linear" | "mirror" | "rotate", dx: 6000, dy: 0, copies: 1, axis: "V" as "V" | "H", at: 6000, cx: 0, cy: 0, dth: 90 });
 
+  const [dc, setDc] = useState({ on: false, Fy: 250, d: 400 });   // design check (steel)
+  const [pdOn, setPdOn] = useState(false);                        // P-Δ second-order
+
   const result = useMemo(() => {
     try { return { r: solveFrame(model), err: "" }; }
     catch (e) { return { r: null, err: e instanceof Error ? e.message : "error" }; }
   }, [model]);
+  const pd = useMemo(() => {
+    if (!pdOn) return null;
+    try { return solveFramePDelta(model); } catch { return null; }
+  }, [model, pdOn]);
 
   const upd = (m: FrameModel) => setModel(m);
   const setNode = (id: number, k: "x" | "y", v: number) =>
@@ -236,11 +245,36 @@ export function FemModelerCalculator() {
               <div className="rounded border border-gray-200 px-2 py-1"><div className="text-[8px] text-gray-500">M_max</div><div className="font-mono text-[11px] font-semibold text-blue-700">{f(Math.max(...r.members.flatMap(m => m.samples.map(s => Math.abs(s.M)))) / 1e6, 1)} kN·m</div></div>
             </div>}
           {r && <div className="mt-1 max-h-28 overflow-auto">
-            <table className="w-full text-[9px]"><thead><tr className="text-gray-400"><th className="text-left">mbr</th><th>N₁(kN)</th><th>V₁(kN)</th><th>M₁(kN·m)</th><th>M₂(kN·m)</th></tr></thead>
-              <tbody className="font-mono">{r.members.map(m => (
-                <tr key={m.id} className="border-b border-gray-100"><td>{m.id}</td><td className="text-right">{f(m.N1 / 1e3, 1)}</td><td className="text-right">{f(m.V1 / 1e3, 1)}</td><td className="text-right">{f(m.M1 / 1e6, 1)}</td><td className="text-right">{f(m.M2 / 1e6, 1)}</td></tr>
-              ))}</tbody></table>
+            <table className="w-full text-[9px]"><thead><tr className="text-gray-400"><th className="text-left">mbr</th><th>N₁(kN)</th><th>V₁(kN)</th><th>M₁(kN·m)</th><th>M₂(kN·m)</th>{dc.on && <th>rasio</th>}</tr></thead>
+              <tbody className="font-mono">{r.members.map(m => {
+                let ratio = 0, ok = true;
+                if (dc.on) {
+                  const sec = model.members.find(mm => mm.id === m.id)!;
+                  const Mmax = Math.max(...m.samples.map(sp => Math.abs(sp.M)));
+                  const Vmax = Math.max(Math.abs(m.V1), Math.abs(m.V2));
+                  const cr = checkSteelMember({ N: m.N1, M: Mmax, V: Vmax, L: m.L, A: sec.A, I: sec.I, d: dc.d, Fy: dc.Fy, E: sec.E, Kfac: 1 });
+                  ratio = cr.ratio; ok = cr.ok;
+                }
+                return (<tr key={m.id} className="border-b border-gray-100"><td>{m.id}</td><td className="text-right">{f(m.N1 / 1e3, 1)}</td><td className="text-right">{f(m.V1 / 1e3, 1)}</td><td className="text-right">{f(m.M1 / 1e6, 1)}</td><td className="text-right">{f(m.M2 / 1e6, 1)}</td>{dc.on && <td className="text-right font-bold" style={{ color: ratio > 1 ? "#dc2626" : ratio > 0.9 ? "#d97706" : "#16a34a" }}>{f(ratio, 2)}</td>}</tr>);
+              })}</tbody></table>
           </div>}
+
+          {/* ── Cek Desain (MIDAS/Robot) + P-Δ nonlinier ── */}
+          <div className="mt-2 border-t border-gray-200 pt-2 space-y-1">
+            <div className="flex flex-wrap items-center gap-2 text-[10px]">
+              <label className="flex items-center gap-1"><input type="checkbox" checked={dc.on} onChange={e => setDc({ ...dc, on: e.target.checked })} /> Cek desain baja (AISC/SNI 1729)</label>
+              {dc.on && <>
+                <span className="text-gray-500">F_y</span><input type="number" value={dc.Fy} onChange={e => setDc({ ...dc, Fy: +e.target.value })} className="w-14 border rounded px-1 font-mono text-[9px]" />
+                <span className="text-gray-500">d</span><input type="number" value={dc.d} onChange={e => setDc({ ...dc, d: +e.target.value })} className="w-14 border rounded px-1 font-mono text-[9px]" />
+                {r && <span className="font-semibold" style={{ color: Math.max(...r.members.map(m => { const sec = model.members.find(mm => mm.id === m.id)!; const Mmax = Math.max(...m.samples.map(sp => Math.abs(sp.M))); return checkSteelMember({ N: m.N1, M: Mmax, V: Math.max(Math.abs(m.V1), Math.abs(m.V2)), L: m.L, A: sec.A, I: sec.I, d: dc.d, Fy: dc.Fy, E: sec.E, Kfac: 1 }).ratio; })) > 1 ? "#dc2626" : "#16a34a" }}>rasio maks = {f(Math.max(...r.members.map(m => { const sec = model.members.find(mm => mm.id === m.id)!; const Mmax = Math.max(...m.samples.map(sp => Math.abs(sp.M))); return checkSteelMember({ N: m.N1, M: Mmax, V: Math.max(Math.abs(m.V1), Math.abs(m.V2)), L: m.L, A: sec.A, I: sec.I, d: dc.d, Fy: dc.Fy, E: sec.E, Kfac: 1 }).ratio; })), 2)}</span>}
+              </>}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[10px]">
+              <label className="flex items-center gap-1"><input type="checkbox" checked={pdOn} onChange={e => setPdOn(e.target.checked)} /> Analisis P-Δ (orde-2 / nonlinier geometrik)</label>
+              {pd && <span className="font-mono text-gray-700">δ₁={f(pd.firstOrderMax, 2)} → δ₂={f(pd.secondOrderMax, 2)} mm · <b style={{ color: pd.diverged ? "#dc2626" : "#1d4ed8" }}>amplifikasi {pd.diverged ? "∞ (tekuk!)" : "×" + f(pd.amplification, 3)}</b> ({pd.iterations} iter)</span>}
+            </div>
+            <p className="text-[9px] text-gray-400">Cek desain & P-Δ memakai gaya batang dari solver FEM (gaya MIDAS/Robot). Rasio &gt;1 = tidak memenuhi (merah).</p>
+          </div>
         </div>
       </div>
     </div>

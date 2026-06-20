@@ -8,6 +8,9 @@ import { solvePlate } from "@/engine/fem/plate";
 import { solveFrame3D, type Frame3DModel } from "@/engine/fem/frame3d";
 import { computeStrainCompatibility, type SteelLayer } from "@/engine/straincompat";
 import { computeInfluenceLine } from "@/engine/fem/influence";
+import { checkSteelMember } from "@/engine/fem/designcheck";
+import { solveFramePDelta } from "@/engine/fem/pdelta";
+import { computeNewmarkSDOF } from "@/engine/timehistory";
 
 const E = 200000, b = 200, h = 400, A = b * h, I = (b * h ** 3) / 12;
 
@@ -173,6 +176,62 @@ describe("Strain-compatibility ULS (Naaman) — full & partial", () => {
     const full = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer] });
     const partial = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer, { kind: "RC", A: 2000, d: 1560, Es: 200000, fy: 420 }] });
     expect(partial.Mn).toBeGreaterThan(full.Mn);
+  });
+});
+
+describe("Design check (AISC/SNI 1729 interaction) — #1", () => {
+  const base = { L: 4000, A: 10000, I: 2e8, d: 400, Fy: 250, E: 200000, Kfac: 1 };
+  test("light load passes (ratio<1), huge load fails (ratio>1)", () => {
+    const light = checkSteelMember({ ...base, N: -200000, M: 50e6, V: 50000 });
+    const heavy = checkSteelMember({ ...base, N: -2000000, M: 400e6, V: 50000 });
+    expect(light.ratio).toBeLessThan(1); expect(light.ok).toBe(true);
+    expect(heavy.ratio).toBeGreaterThan(1); expect(heavy.ok).toBe(false);
+  });
+  test("H1-1 form: high axial uses Pr/Pc+8/9·Mr/Mc", () => {
+    const r = checkSteelMember({ ...base, N: -600000, M: 100e6, V: 0 });
+    expect(r.Pr_Pc).toBeGreaterThan(0.2);
+    expect(r.interaction).toBeCloseTo(r.Pr_Pc + (8 / 9) * r.Mr_Mc, 6);
+  });
+  test("tension governs axial capacity = φ·Fy·A", () => {
+    const r = checkSteelMember({ ...base, N: 500000, M: 0, V: 0 });
+    expect(r.phiPn).toBeCloseTo(0.9 * 250 * 10000, 0);
+  });
+});
+
+describe("P-Δ geometric nonlinear (#2) — amplification ≈ 1/(1−P/Pcr)", () => {
+  test("compression amplifies lateral deflection toward 1/(1−P/Pcr)", () => {
+    const L = 8000, E = 200000, I = 2e8, A = 10000, NEL = 8;
+    const Pcr = (Math.PI ** 2 * E * I) / (L * L);
+    const P = 0.3 * Pcr;
+    const xs = Array.from({ length: NEL + 1 }, (_, k) => (L * k) / NEL);
+    const model = {
+      nodes: xs.map((x, i) => ({ id: i + 1, x, y: 0 })),
+      members: xs.slice(1).map((_, i) => ({ id: i + 1, n1: i + 1, n2: i + 2, E, A, I })),
+      supports: [{ node: 1, ux: true, uy: true, rz: false }, { node: NEL + 1, ux: false, uy: true, rz: false }],
+      nodalLoads: [{ node: NEL + 1, fx: -P }],
+      memberLoads: xs.slice(1).map((_, i) => ({ member: i + 1, w: -5 })),
+    };
+    const r = solveFramePDelta(model);
+    const theory = 1 / (1 - 0.3);
+    expect(r.amplification).toBeGreaterThan(1.1);
+    expect(Math.abs(r.amplification - theory) / theory).toBeLessThan(0.15);
+  });
+});
+
+describe("Newmark-β time history (#2) — linear dynamic", () => {
+  const m = 1000, k = 1e6;             // wn = √(k/m)=31.6, Tn≈0.199 s
+  test("Tn = 2π√(m/k)", () => {
+    const r = computeNewmarkSDOF({ m, k, zeta: 0.05, dt: 0.002, tEnd: 2, forcing: "HARMONIC", p0: 1000, omega: 1 });
+    expect(r.Tn).toBeCloseTo(2 * Math.PI * Math.sqrt(m / k), 4);
+  });
+  test("quasi-static (ω≪ωn) → DAF ≈ 1", () => {
+    const r = computeNewmarkSDOF({ m, k, zeta: 0.05, dt: 0.002, tEnd: 10, forcing: "HARMONIC", p0: 1000, omega: 1 });
+    expect(r.DAF).toBeGreaterThan(0.8); expect(r.DAF).toBeLessThan(1.3);
+  });
+  test("resonance (ω=ωn, ζ=0.05) → large DAF (≈1/2ζ)", () => {
+    const wn = Math.sqrt(k / m);
+    const r = computeNewmarkSDOF({ m, k, zeta: 0.05, dt: 0.001, tEnd: 20, forcing: "HARMONIC", p0: 1000, omega: wn });
+    expect(r.DAF).toBeGreaterThan(6);
   });
 });
 

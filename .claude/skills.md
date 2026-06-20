@@ -1495,3 +1495,34 @@ MOVING LOAD: interpolate IL(x); slide axle group (P,dx), response=ΣP·IL(x_axle
 REACTION (frame.ts): solve on penalty COPY (Ksolve/Fsolve); reactions from PURE
   K & F → R=Σ K[dof][j]·d[j] − F[dof] (exact even with load on a support).
 ```
+
+---
+
+## Skill: midas-designcheck-nonlinear-th (design check + P-Δ + time history)
+
+```
+name: midas-designcheck-nonlinear-th
+description: >
+  MIDAS/Robot-style post-processing & nonlinear: engine/fem/designcheck.ts
+  (AISC/SNI 1729 steel utilisation ratio H1-1, integrated into 🧮 modeler),
+  engine/fem/pdelta.ts (geometric nonlinear P-Δ, amplification 1/(1−P/Pcr)),
+  engine/timehistory.ts (Newmark-β SDOF time history, tab 🌊). Refs MD(40)-(70)
+  MIDAS Gen (pushover, base-isolation, time-history). Trigger on: design check,
+  utilisation ratio, code check, P-Delta, second-order, buckling amplification,
+  time history, Newmark, dynamic response, pushover, base isolation.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+DESIGN CHECK (steel): λ=KL/√(I/A); Fcr (0.658^(Fy/Fe)Fy if λ≤4.71√(E/Fy) else
+  0.877Fe); φPn=0.9·(FyA tension|FcrA comp); φMn=0.9Fy·Z (Z≈1.12·2I/d); φVn=
+  0.9·0.6Fy·0.5A; H1-1 interaction; ratio=max(interaction,shear). Colour by ratio.
+P-Δ: K_g(P) consistent geometric (tension+); iterate solve→axial fl[3]→K_e+K_g→
+  re-solve; amplification δ₂/δ₁ → 1/(1−P/Pcr); divergence ⇒ buckling.
+NEWMARK-β: γ=½ β=¼; khat=k+a1; step phat=p+a1·u+a2·v+a3·a; u=phat/khat; update
+  v,a. Validate Tn=2π√(m/k), low-ω DAF≈1, resonance DAF≈1/2ζ.
+NEXT (MD): pushover (plastic-hinge incremental), base isolation (isolator/damper).
+```
