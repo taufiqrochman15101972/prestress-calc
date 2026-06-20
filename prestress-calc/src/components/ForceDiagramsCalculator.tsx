@@ -6,6 +6,7 @@ import {
   computeBeamFields, queryAt, jetColor,
   type BeamFieldInputs, type FieldKind,
 } from "@/engine/internalforces";
+import { computeBeamFieldsFEM } from "@/engine/fem/beamfields";
 import { concreteModulus } from "@/lib/utils";
 
 const FIELD_META: { key: FieldKind; label: string; unit: string; color: string }[] = [
@@ -27,6 +28,7 @@ export function ForceDiagramsCalculator() {
   const [on, setOn] = useState<Record<FieldKind, boolean>>({
     Mz: true, Vy: true, N: false, T: false, My: false, Vx: false, dz: true, dy: false,
   });
+  const [useFEM, setUseFEM] = useState(true);        // solver source: FEM vs closed-form
   const [wLatLocal, setWLatLocal] = useState(0);     // kN/m lateral (wind) for demo
   const [clickX, setClickX] = useState<number | null>(null);
   const [clickY, setClickY] = useState<number | null>(null);   // mm from NA
@@ -61,7 +63,7 @@ export function ForceDiagramsCalculator() {
     };
   }, [results, inputs, wLatLocal]);
 
-  const res = useMemo(() => (fin ? computeBeamFields(fin) : null), [fin]);
+  const res = useMemo(() => (fin ? (useFEM ? computeBeamFieldsFEM(fin) : computeBeamFields(fin)) : null), [fin, useFEM]);
 
   if (!results || !fin || !res) {
     return <p className="text-[11px] text-gray-500">Jalankan desain utama dulu (panel input) agar diagram gaya dalam &amp; tegangan dapat ditampilkan.</p>;
@@ -111,9 +113,16 @@ export function ForceDiagramsCalculator() {
 
   return (
     <div className="text-[11px]">
-      <p className="text-[9px] font-bold uppercase text-gray-400 mb-1">
-        Diagram Gaya Dalam, Tegangan &amp; Lendutan — real-time (mekanika bahan lanjut; siap dikembangkan ke FEM/FEA)
-      </p>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[9px] font-bold uppercase text-gray-400">
+          Diagram Gaya Dalam, Tegangan &amp; Lendutan — real-time
+        </p>
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="text-gray-500">Sumber:</span>
+          <button onClick={() => setUseFEM(true)} className={`px-2 py-0.5 rounded border ${useFEM ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>Solver FEM</button>
+          <button onClick={() => setUseFEM(false)} className={`px-2 py-0.5 rounded border ${!useFEM ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>Closed-form</button>
+        </div>
+      </div>
 
       {/* checkboxes */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">

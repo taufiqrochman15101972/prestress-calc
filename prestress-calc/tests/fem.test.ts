@@ -2,6 +2,9 @@ import { describe, test, expect } from "vitest";
 import { solveFrame, frameLocalK, type FrameModel } from "@/engine/fem/frame";
 import { linearRepeat, mirror, rotateCopy } from "@/engine/fem/model";
 import { membraneK, plateK, flatShellK } from "@/engine/fem/shell";
+import { computeBeamFieldsFEM } from "@/engine/fem/beamfields";
+import { computeBeamFields, type BeamFieldInputs } from "@/engine/internalforces";
+import { solvePlate } from "@/engine/fem/plate";
 
 const E = 200000, b = 200, h = 400, A = b * h, I = (b * h ** 3) / 12;
 
@@ -91,6 +94,45 @@ describe("Pre-processor copy methods", () => {
   test("rotateCopy makes a circular pattern", () => {
     const r = rotateCopy(base, [1], 0, 0, 90, 3);
     expect(r.members.length).toBe(4);
+  });
+});
+
+describe("📊 fields via FEM solver ≈ closed-form", () => {
+  const fin: BeamFieldInputs = {
+    L: 30000, EI: 200000 * 1.77e11, EIlat: 200000 * 1e10,
+    wUDL: 30, Pmid: 0, wBal: 18, Plong: 4_500_000, e: 650,
+    A: 535000, Ig: 1.77e11, yb: 770, yt: 880, Tu: 0, wLat: 0, Naxial: 0, samples: 81,
+  };
+  test("max |Mz| and mid deflection match within 2%", () => {
+    const fem = computeBeamFieldsFEM(fin);
+    const cf = computeBeamFields(fin);
+    const maxM = (r: typeof fem) => Math.max(...r.pts.map(p => Math.abs(p.Mz)));
+    expect(Math.abs(maxM(fem) - maxM(cf)) / maxM(cf)).toBeLessThan(0.02);
+    const minDz = (r: typeof fem) => Math.min(...r.pts.map(p => p.dz));
+    expect(Math.abs(minDz(fem) - minDz(cf)) / Math.abs(minDz(cf))).toBeLessThan(0.02);
+  });
+  test("axial N carried as prestress compression", () => {
+    const fem = computeBeamFieldsFEM(fin);
+    expect(fem.pts[10].N).toBeCloseTo(-fin.Plong, 3);
+  });
+});
+
+describe("Plate FEM solve (meshing) vs thin-plate theory", () => {
+  test("SS square plate central deflection within ~15% of theory (coarse mesh)", () => {
+    const r = solvePlate({ a: 4000, b: 4000, nx: 10, ny: 10, t: 200, E: 25000, nu: 0.3, q: 0.01, edge: "SS" });
+    expect(r.ratio).toBeGreaterThan(0.85);
+    expect(r.ratio).toBeLessThan(1.15);
+    expect(r.centerW).toBeLessThan(0);   // downward
+  });
+  test("clamped plate deflects less than simply-supported", () => {
+    const ss = solvePlate({ a: 4000, b: 4000, nx: 8, ny: 8, t: 200, E: 25000, nu: 0.3, q: 0.01, edge: "SS" });
+    const cl = solvePlate({ a: 4000, b: 4000, nx: 8, ny: 8, t: 200, E: 25000, nu: 0.3, q: 0.01, edge: "CLAMPED" });
+    expect(Math.abs(cl.centerW)).toBeLessThan(Math.abs(ss.centerW));
+  });
+  test("thin plate does NOT lock (t/a=1/200 still converges near theory)", () => {
+    const r = solvePlate({ a: 4000, b: 4000, nx: 10, ny: 10, t: 20, E: 25000, nu: 0.3, q: 0.0001, edge: "SS" });
+    expect(r.ratio).toBeGreaterThan(0.8);   // no shear locking → not stiff/near-zero
+    expect(r.ratio).toBeLessThan(1.2);
   });
 });
 

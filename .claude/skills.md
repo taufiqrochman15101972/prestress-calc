@@ -1403,3 +1403,34 @@ ZERO-COPY: keep heavy data in Float64Array, pass by reference (assemble→solve�
 3 COPY METHODS: linearRepeat(dx,dy,n) / mirror(V|H,at) / rotateCopy(cx,cy,dθ,n),
   merge coincident nodes within TOL.
 ```
+
+---
+
+## Skill: fem-plate-iso (📊→FEM wiring, isometric axes, plate solve)
+
+```
+name: fem-plate-iso
+description: >
+  📊 force diagrams wired to the FEM solver (fem/beamfields.ts computeBeamFieldsFEM
+  → BeamFieldResult; toggle FEM⇄closed-form). Global axes X→right/Y→front/Z→up,
+  ISOMETRIC view (true scale) + axis triad in FEM/plate viewports. Plate/shell
+  meshing+solve (fem/plate.ts solvePlate, ▦ tab, Q4 Mindlin-SRI, SS/clamped,
+  isometric deflected colored surface, validated vs thin-plate theory, no shear
+  locking). Trigger on: wire diagrams to FEM, isometric view, global axes, plate
+  mesh/solve, deflection surface, shell solve.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+ISO: cI=cos30,sI=sin30 ; isoX=(X−Y)cI ; isoUp=Z−(X+Y)sI ; screen.x=ox+isoX·sc,
+  screen.y=oy−isoUp·sc. X→right-down, Y→left-down(front), Z→up. Triad in corner.
+BEAMFIELDS-FEM: 40-elem SS frame ; gravity solve (−wUDL)→Mz/Vy + dz_grav ;
+  camber solve (+wBal)→dz_camber ; dz=sum ; Mz GRAVITY-ONLY (P·e added in query).
+  Validate ≈ closed-form with RELATIVE tol (not toBeCloseTo for big numbers).
+PLATE solve: mesh nx×ny Q4 plateK (3 DOF/node) ; load −q·Ae/4 → w DOF (down) ;
+  BC SS w=0 / clamped w=θ=0 penalty ; theory w=α·q·a⁴/D (SS 0.00406, clamp 0.00126)
+  ; ratio→1 confirms convergence & no shear locking (test thin t/a=1/200 too).
+```

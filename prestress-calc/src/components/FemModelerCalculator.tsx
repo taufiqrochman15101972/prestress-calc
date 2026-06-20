@@ -58,20 +58,31 @@ export function FemModelerCalculator() {
     else upd(rotateCopy(model, ids, cp.cx, cp.cy, cp.dth, cp.copies));
   };
 
-  // ── view transform ──
-  const xs = model.nodes.map(n => n.x), ys = model.nodes.map(n => n.y);
-  const minX = Math.min(...xs, 0), maxX = Math.max(...xs, 1), minY = Math.min(...ys, 0), maxY = Math.max(...ys, 1);
-  const W = 520, H = 320, pad = 36;
-  const sx = (W - 2 * pad) / Math.max(maxX - minX, 1), sy = (H - 2 * pad) / Math.max(maxY - minY, 1);
-  const sc = Math.min(sx, sy);
-  const px = (x: number) => pad + (x - minX) * sc;
-  const py = (y: number) => H - pad - (y - minY) * sc;
+  // ── isometric view: global X→right, Y→front (depth), Z→up ──
+  // 2D frame lives in the X–Z plane (node.x = X, node.y = Z up); depth Y=0 now,
+  // ready for 3D. True-scale isometric (no perspective shrink), just "cornered".
+  const ISO = Math.PI / 6, cI = Math.cos(ISO), sI = Math.sin(ISO);
+  const isoX = (X: number, Y: number) => (X - Y) * cI;
+  const isoUp = (X: number, Y: number, Z: number) => Z - (X + Y) * sI;
+  const W = 540, H = 330, pad = 42;
+  const pj = model.nodes.map(n => ({ ix: isoX(n.x, 0), iy: isoUp(n.x, 0, n.y) }));
+  const minIX = Math.min(...pj.map(p => p.ix), 0), maxIX = Math.max(...pj.map(p => p.ix), 1);
+  const minIY = Math.min(...pj.map(p => p.iy), 0), maxIY = Math.max(...pj.map(p => p.iy), 1);
+  const sc = Math.min((W - 2 * pad) / Math.max(maxIX - minIX, 1), (H - 2 * pad) / Math.max(maxIY - minIY, 1));
+  const ox = pad - minIX * sc, oy = H - pad + minIY * sc;
+  const P = (X: number, Z: number, Y = 0) => ({ x: ox + isoX(X, Y) * sc, y: oy - isoUp(X, Y, Z) * sc });
+  const Xs = model.nodes.map(n => n.x), Zs = model.nodes.map(n => n.y);
+  const spanModel = Math.max(Math.max(...Xs) - Math.min(...Xs), Math.max(...Zs) - Math.min(...Zs), 1);
   const r = result.r;
-  const dispMax = r ? Math.max(r.maxDisp, 1e-9) : 1;
-  const defScale = r ? (0.12 * Math.max(maxX - minX, maxY - minY)) / dispMax : 0;
+  const defScale = r ? (0.12 * spanModel) / Math.max(r.maxDisp, 1e-9) : 0;
 
   const nodeById = new Map(model.nodes.map(n => [n.id, n]));
   const dispById = new Map((r?.disp ?? []).map(d => [d.node, d]));
+  // axis triad (corner), unit screen directions
+  const tri = { x0: 50, y0: H - 30, len: 22 };
+  const triX = { x: tri.x0 + cI * tri.len, y: tri.y0 + sI * tri.len };
+  const triY = { x: tri.x0 - cI * tri.len, y: tri.y0 + sI * tri.len };
+  const triZ = { x: tri.x0, y: tri.y0 - tri.len };
 
   return (
     <div className="text-[11px]">
@@ -169,39 +180,52 @@ export function FemModelerCalculator() {
             {/* members */}
             {model.members.map(m => {
               const a = nodeById.get(m.n1), b = nodeById.get(m.n2); if (!a || !b) return null;
-              return <line key={m.id} x1={px(a.x)} y1={py(a.y)} x2={px(b.x)} y2={py(b.y)} stroke="#334155" strokeWidth="1.6" />;
+              const pa = P(a.x, a.y), pb = P(b.x, b.y);
+              return <line key={m.id} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#334155" strokeWidth="1.6" />;
             })}
-            {/* diagram or deflected overlay */}
+            {/* deflected overlay */}
             {r && view === "deflect" && model.members.map(m => {
               const a = nodeById.get(m.n1)!, b = nodeById.get(m.n2)!;
               const d1 = dispById.get(m.n1)!, d2 = dispById.get(m.n2)!;
-              const pts = deflectedShape(a.x, a.y, b.x, b.y, d1, d2, defScale).map(p => `${px(p.x)},${py(p.y)}`).join(" ");
+              const pts = deflectedShape(a.x, a.y, b.x, b.y, d1, d2, defScale).map(p => { const q = P(p.x, p.y); return `${q.x},${q.y}`; }).join(" ");
               return <polyline key={m.id} points={pts} fill="none" stroke="#dc2626" strokeWidth="1.4" />;
             })}
+            {/* N/V/M diagram (offset ⟂ member in the X–Z plane) */}
             {r && (view === "N" || view === "V" || view === "M") && model.members.map(m => {
               const mf = r.members.find(x => x.id === m.id); const a = nodeById.get(m.n1)!, b = nodeById.get(m.n2)!;
               if (!mf) return null;
-              const c = (b.x - a.x) / mf.L, s = (b.y - a.y) / mf.L, nx = -s, ny = c;  // perp
+              const c = (b.x - a.x) / mf.L, s = (b.y - a.y) / mf.L, nx = -s, ny = c;  // perp in X–Z
               const vals = mf.samples.map(sp => view === "N" ? sp.N : view === "V" ? sp.V : sp.M);
               const vmax = Math.max(...vals.map(Math.abs), 1e-9);
-              const amp = 0.10 * Math.max(maxX - minX, maxY - minY) / vmax;
+              const amp = 0.10 * spanModel / vmax;
+              const pa = P(a.x, a.y), pb = P(b.x, b.y);
               const pts = mf.samples.map((sp, i) => {
                 const xx = a.x + c * sp.x + nx * vals[i] * amp, yy = a.y + s * sp.x + ny * vals[i] * amp;
-                return `${px(xx)},${py(yy)}`;
+                const q = P(xx, yy); return `${q.x},${q.y}`;
               });
-              const base = `${px(a.x)},${py(a.y)} ${pts.join(" ")} ${px(b.x)},${py(b.y)}`;
+              const base = `${pa.x},${pa.y} ${pts.join(" ")} ${pb.x},${pb.y}`;
               const col = view === "N" ? "#6b7280" : view === "V" ? "#0891b2" : "#1d4ed8";
               return <polygon key={m.id} points={base} fill={col} fillOpacity="0.18" stroke={col} strokeWidth="1" />;
             })}
             {/* nodes + supports */}
             {model.nodes.map(n => {
               const s = model.supports.find(su => su.node === n.id);
+              const q = P(n.x, n.y);
               return (<g key={n.id}>
-                <circle cx={px(n.x)} cy={py(n.y)} r="2.5" fill="#1e293b" />
-                <text x={px(n.x) + 4} y={py(n.y) - 4} fontSize="8" fill="#475569">{n.id}</text>
-                {s && (s.ux || s.uy) && <polygon points={`${px(n.x) - 5},${py(n.y) + 9} ${px(n.x) + 5},${py(n.y) + 9} ${px(n.x)},${py(n.y)}`} fill={s.rz ? "#475569" : "none"} stroke="#475569" strokeWidth="1" />}
+                <circle cx={q.x} cy={q.y} r="2.5" fill="#1e293b" />
+                <text x={q.x + 4} y={q.y - 4} fontSize="8" fill="#475569">{n.id}</text>
+                {s && (s.ux || s.uy) && <polygon points={`${q.x - 5},${q.y + 9} ${q.x + 5},${q.y + 9} ${q.x},${q.y}`} fill={s.rz ? "#475569" : "none"} stroke="#475569" strokeWidth="1" />}
               </g>);
             })}
+            {/* axis triad: X→right, Y→front, Z→up (isometric) */}
+            <g>
+              <line x1={tri.x0} y1={tri.y0} x2={triX.x} y2={triX.y} stroke="#dc2626" strokeWidth="1.4" />
+              <line x1={tri.x0} y1={tri.y0} x2={triY.x} y2={triY.y} stroke="#16a34a" strokeWidth="1.4" />
+              <line x1={tri.x0} y1={tri.y0} x2={triZ.x} y2={triZ.y} stroke="#1d4ed8" strokeWidth="1.4" />
+              <text x={triX.x + 1} y={triX.y + 6} fontSize="8" fill="#dc2626">X</text>
+              <text x={triY.x - 8} y={triY.y + 6} fontSize="8" fill="#16a34a">Y</text>
+              <text x={triZ.x - 2} y={triZ.y - 2} fontSize="8" fill="#1d4ed8">Z</text>
+            </g>
           </svg>
 
           {result.err
