@@ -1308,3 +1308,61 @@ rectangles sorted by area → substructure candidates.
 UNITS unknown in DXF → UI scale selector (×1 mm / ×10 cm / ×1000 m).
 DWG is BINARY → not parseable here; instruct export to DXF.
 ```
+
+---
+
+## Skill: dwg-converter (DWG→DXF in-project)
+
+```
+name: dwg-converter
+description: >
+  Reusable in-project DWG→DXF converter — lib/dwgConvert.ts lazy-loads LibreDWG
+  WebAssembly (@mlightcad/libredwg-web) client-only; dwg_write_dxf(ArrayBuffer)
+  → DXF text → engine/dxfimport.ts. Tab 📐 accepts .dwg directly (auto-convert)
+  or .dxf. Use for any new .dwg drawing. Trigger on: read/convert DWG, DWG to DXF.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+const mod = await import("@mlightcad/libredwg-web"); // client-only dynamic import
+const lib = await mod.LibreDwg.create();             // loads WASM (cache it)
+const dxfBytes = lib.dwg_write_dxf(arrayBuffer);     // Uint8Array | null
+const dxfText = new TextDecoder().decode(dxfBytes);  // → analyseDxf()
+NOTE: keep import dynamic (never top-level) so SSR/main-bundle stay clean; build OK.
+Old/corrupt DWG that LibreDWG can't read → ask user to re-export DXF in CAD.
+```
+
+---
+
+## Skill: force-diagrams (Diagram Gaya Dalam & Tegangan, OriginPro-style)
+
+```
+name: force-diagrams
+description: >
+  Real-time internal-force / stress / deflection diagrams — engine/internalforces.ts
+  (computeBeamFields: Mz/My/Vy/Vx/N/T/dz/dy fields along span from SoM equilibrium;
+  queryAt: point query with Navier & kernel stress (equivalent); jetColor colormap)
+  + ForceDiagramsCalculator.tsx (tab 📊). OriginPro/IDEA-StatiCa/Robot/MIDAS look:
+  filled jet-gradient curves, checkbox toggles, click span→forces, click section
+  height→σ + deflection. Pre-FEM (architecture ready for FEM/FEA). Style ref
+  O1–O10.pdf. Trigger on: bending/shear/axial/torsion diagram, deflection plot,
+  stress distribution, interactive beam, OriginPro/contour/colormap output.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+FIELDS (simply-supported): Mz=w·x(L−x)/2 (+point) ; Vy=R−wx ; N=−P+Next ;
+  dz = −(udlDefl(w)+pointDefl) + udlDefl(wBal up) ; My/Vx/dy from wLat ; T=Tu.
+  udlDefl=w·x(L³−2Lx²+x³)/24EI ; pointDefl central standard.
+STRESS (equivalent): Navier σ=N/A+P·e·y/I−Mz·y/I ; kernel σ=(−P/A)(1−e·y/r²)−Mz·y/I
+  (identical since r²=I/A). y up from NA, tension +, compression −.
+INPUTS from store: Pe(kN→N), e=yb−yResultant, EI=Ec·Ig, Iy≈Σb³h/12, wBal=8Pe·e/L².
+UI: jetColor(norm −1..1) blue→green→red ; click maps px→x (span) / py→y (height).
+NOTE: pre-FEM SoM equilibrium — correct & beautiful now, FEM/FEA later.
+```

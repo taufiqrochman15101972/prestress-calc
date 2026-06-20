@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { analyseDxf, type DxfParseResult } from "@/engine/dxfimport";
+import { convertDwgToDxf } from "@/lib/dwgConvert";
 import { useDesignStore } from "@/store/useDesignStore";
 
 function Row({ label, value, unit, hi }: { label: string; value: string; unit?: string; hi?: boolean }) {
@@ -22,23 +23,31 @@ export function DxfImportCalculator() {
   const [msg, setMsg] = useState("");
   const { updateGirder, updateLoads, updateDeck, inputs } = useDesignStore();
 
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    const rd = new FileReader();
-    rd.onload = () => {
-      try {
-        const txt = String(rd.result ?? "");
-        if (!/\bENTITIES\b|\bLWPOLYLINE\b|\bLINE\b|^\s*0\s*$/m.test(txt)) {
-          setMsg("File tidak tampak seperti DXF ASCII. Ekspor dari CAD: SAVE AS → DXF (atau DXFOUT).");
-          setRes(null); return;
-        }
-        setRes(analyseDxf(txt));
-        setMsg("");
-      } catch { setMsg("Gagal mem-parse DXF."); setRes(null); }
-    };
-    rd.readAsText(file);
+    const isDwgName = /\.dwg$/i.test(file.name);
+    try {
+      if (isDwgName) {
+        setMsg("Mengonversi DWG → DXF (LibreDWG WASM)…");
+        const buf = await file.arrayBuffer();
+        const dxfText = await convertDwgToDxf(buf);
+        setRes(analyseDxf(dxfText));
+        setMsg("DWG dikonversi & dibaca otomatis. ✓");
+        return;
+      }
+      const txt = await file.text();
+      if (!/\bENTITIES\b|\bLWPOLYLINE\b|\bLINE\b|^\s*0\s*$/m.test(txt)) {
+        setMsg("File tidak tampak seperti DXF ASCII. Ekspor dari CAD: SAVE AS → DXF (atau DXFOUT).");
+        setRes(null); return;
+      }
+      setRes(analyseDxf(txt));
+      setMsg("");
+    } catch (err) {
+      setMsg(`Gagal membaca file: ${err instanceof Error ? err.message : "error"}. Untuk DWG lama/rusak, coba ekspor ulang ke DXF.`);
+      setRes(null);
+    }
   };
 
   const mm = (v: number) => v * scale;
@@ -68,16 +77,16 @@ export function DxfImportCalculator() {
 
   return (
     <div className="text-[11px] space-y-3">
-      <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-800">
-        <b>DWG (biner) tidak dapat dibaca langsung</b> tanpa konverter (ODA/AutoCAD) — tidak tersedia di lingkungan ini.
-        Ekspor gambar Anda ke <b>DXF (ASCII)</b> di CAD: <span className="font-mono">SAVE AS → AutoCAD DXF</span> atau perintah <span className="font-mono">DXFOUT</span>, lalu unggah di sini.
-        Parser mengekstrak <b>extents (panjang/lebar jembatan), profil girder, spasi girder/diafragma, dimensi & teks</b>, serta kotak substruktur (abutment/pier/pilecap/pierhead).
+      <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[10px] text-sky-800">
+        <b>Konverter DWG→DXF terpasang</b> (LibreDWG WebAssembly) — Anda dapat mengunggah <b>.dwg langsung</b> (otomatis dikonversi) atau <b>.dxf</b>.
+        Parser mengekstrak <b>extents (panjang/lebar jembatan), profil & tinggi girder, spasi girder/diafragma, dimensi & teks</b>, serta kotak substruktur (abutment/pier/pilecap/pierhead) → tombol "terapkan" mengisi desain.
+        (Bila DWG sangat lama/rusak gagal, ekspor ulang ke DXF di CAD: <span className="font-mono">SAVE AS → DXF</span>.)
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <label className="px-3 py-1.5 rounded bg-blue-600 text-white text-[11px] font-semibold cursor-pointer hover:bg-blue-700">
-          📐 Pilih file .dxf
-          <input type="file" accept=".dxf,text/plain" className="hidden" onChange={onFile} />
+          📐 Pilih file .dwg / .dxf
+          <input type="file" accept=".dxf,.dwg,text/plain" className="hidden" onChange={onFile} />
         </label>
         {fileName && <span className="text-[10px] text-gray-500 font-mono">{fileName}</span>}
         <div className="flex items-center gap-1">
