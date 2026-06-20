@@ -40,8 +40,9 @@ import { SeismicSNICalculator } from "@/components/SeismicSNICalculator";
 import { CableStayedCalculator } from "@/components/CableStayedCalculator";
 import { SteelTrussCalculator } from "@/components/SteelTrussCalculator";
 import { SeismicDynamicsCalculator } from "@/components/SeismicDynamicsCalculator";
+import { DxfImportCalculator } from "@/components/DxfImportCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf";
 
 interface Props {
   open: boolean;
@@ -278,6 +279,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Steel truss Pratt/Warren/Howe (Rochman & Suhariyanto) — beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur AASHTO/SNI 1729) (book 210)",
   },
   {
+    key: "dxf",
+    emoji: "📐",
+    title: "Impor Gambar DXF",
+    subtitle: "Baca geometri dari gambar CAD (ekspor DWG→DXF): extents panjang/lebar jembatan, profil & tinggi girder, spasi girder/diafragma, dimensi & teks, kotak abutment/pier/pilecap/pierhead → terapkan ke desain (bentang, lebar dek, tinggi girder)",
+  },
+  {
     key: "profiles",
     emoji: "📚",
     title: "Database Profil Girder",
@@ -367,6 +374,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "dxf" && "Impor DXF (ASCII) — DWG biner tidak dapat dibaca tanpa konverter, ekspor SAVE AS → DXF / DXFOUT. Parser mengekstrak extents (panjang/lebar jembatan), bounding-box profil girder, spasi girder/diafragma (median garis vertikal), nilai DIMENSION (kode 42), teks, & kotak substruktur — lalu terapkan ke bentang/lebar dek/tinggi girder. Geometri dari gambar Anda, bukan tebakan."}
           {tab === "profiles" && "Katalog profil girder pracetak/prategang — WIKA WF · AASHTO I–VI · PCI Bulb-Tee/I · NU (Nebraska) · CPCI (Kanada) · Deck Bulb-Tee · Double-Tee · PC-U · Voided Slab · Box · AASHTO Box BI–BIV · Segmental Box · AASHTO Slab · properti penampang terurut dimensi"}
           {tab === "rcgirder" && "Standar Jembatan Gelagar Beton Bertulang Balok-T, Bentang 5–25 m (Direktorat Jenderal Bina Marga) + AASHTO LRFD §4.6.2.6 / §5 + SNI 2847:2019 + SNI 1725:2016 — beton bertulang biasa, lentur penampang-T & geser, kontrol regangan"}
           {tab === "madecont" && "NCHRP Report 322 'Design of Precast Prestressed Bridge Girders Made Continuous' + Freyermuth/PCA + PCI BDM §11.1 — momen restraint M_r=(M_p+M_g)(1−e^−φ)+M_sh(1−e^−φ)/φ, metode rotasi 3-momen, sambungan momen-positif §5.12.3.3"}
@@ -409,6 +417,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "madecont" && <MadeContinuousCalculator />}
           {tab === "foundation" && <FoundationCalculator />}
           {tab === "seisdyn" && <SeismicDynamicsCalculator />}
+          {tab === "dxf" && <DxfImportCalculator />}
           {tab === "snieq" && <SeismicSNICalculator />}
           {tab === "cable" && <CableStayedCalculator />}
           {tab === "truss" && <SteelTrussCalculator />}

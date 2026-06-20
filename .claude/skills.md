@@ -1273,3 +1273,38 @@ REPORT WIRING: foundation.enabled → pierK=3EI/H³ → SDOF Sd = Δ_D → capac
   liquefaction from foundation soil ; render report §31. NOTE: PDF numbers never
   a code reference — procedure only.
 ```
+
+---
+
+## Skill: dxf-import (Impor Geometri Gambar CAD)
+
+```
+name: dxf-import
+description: >
+  Read bridge geometry from CAD drawings — engine/dxfimport.ts (pure ASCII-DXF
+  parser) + tab 📐 Impor Gambar DXF. parseDxf tokenises group-code/value pairs;
+  analyseDxf extracts extents (bridge length/width), girder cross-section bbox
+  (→ profile H), girder/diaphragm spacing (median vertical-line gap), DIMENSION
+  values (code 42), TEXT/MTEXT labels, and substructure rectangles (abutment/
+  pier/pilecap/pierhead). Apply buttons set span / deck width / girder height.
+  IMPORTANT: binary DWG (AC1015/AC1018) cannot be parsed without a converter
+  (ODA/AutoCAD/python) — none in this env; user must export DWG→DXF (SAVE AS →
+  DXF or DXFOUT). Trigger on: read DWG, read DXF, import CAD geometry, extract
+  span/girder spacing/profile from drawing.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+DXF = alternating lines (group-code \n value). code 0 starts an entity (value=type).
+collect codes into Record<number,string[]> (arrays keep polyline 10/20 repeats).
+LINE 10/20→11/21 ; LWPOLYLINE 10[]/20[] vertices ; CIRCLE 10/20/40 ; TEXT 1+10/20 ;
+DIMENSION measured value = code 42.
+HEURISTICS: extents = bbox(all points) ; girderProfile = tallest polyline with
+0.6w ≤ h ≤ 6w ; memberSpacing = median gap of vertical-line x-positions ;
+rectangles sorted by area → substructure candidates.
+UNITS unknown in DXF → UI scale selector (×1 mm / ×10 cm / ×1000 m).
+DWG is BINARY → not parseable here; instruct export to DXF.
+```
