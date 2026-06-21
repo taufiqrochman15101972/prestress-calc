@@ -1526,3 +1526,38 @@ NEWMARK-β: γ=½ β=¼; khat=k+a1; step phat=p+a1·u+a2·v+a3·a; u=phat/khat; 
   v,a. Validate Tn=2π√(m/k), low-ω DAF≈1, resonance DAF≈1/2ζ.
 NEXT (MD): pushover (plastic-hinge incremental), base isolation (isolator/damper).
 ```
+
+---
+
+## Skill: pushover-isolation-benchmark (MIDAS nonlinear + verification)
+
+```
+name: pushover-isolation-benchmark
+description: >
+  Pushover (engine/fem/pushover.ts, event-to-event plastic hinge via static
+  condensation, capacity curve, tab 📈), base isolation (engine/baseisolation.ts,
+  AASHTO/SNI T_iso/B/shear-reduction, tab 🛡), and BENCHMARK VERIFICATION
+  (tests/benchmark.test.ts) vs theory (fixed-fixed, propped, continuous, Euler
+  buckling Gere-Timoshenko, 2-DOF eigenvalue Greenwood — MIDAS FEA Verification
+  Manual). P-Δ amplification fixed to per-direction (axial≈1, lateral amplifies).
+  Trigger on: pushover, capacity curve, plastic hinge, base isolation, isolator,
+  damper, benchmark, verification, buckling load, eigenvalue, MIDAS verification.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+PUSHOVER: refLoad pattern×λ; per step compute end moments (condense released rot
+  DOFs, recover dr=−Σk[r][j]d[j]/k[r][r] so f[r]=0); Δλ=min((±Mp−Mcur)/rate);
+  insert hinge; record (Δ_control, base shear); stop at mechanism. Verify
+  cantilever V_max≈Mp/H.
+ISOLATION: T_iso=2π√(W/gK_iso); B=max(0.8,(ζ/0.05)^0.3); Sa(T_iso)/B; Viso<Vfixed;
+  d_iso=Sa·g·(T/2π)². 
+P-Δ amplitude: measure per translational direction (max|ux|,max|uy|), amp=max of
+  ratios → axial direction ≈1, lateral → 1/(1−P/Pcr). Don't use hypot (axial dominates).
+BENCHMARK vs theory: fixed-fixed δ=wL⁴/384EI M=wL²/12; propped 3wL/8; 2-span 1.25wL;
+  Euler Pcr=π²EI/L² (pin) & π²EI/4L² (cantilever) [Gere&Timoshenko]; 2-DOF equal m,k
+  → ω²=(3∓√5)/2·k/m [Greenwood]. MIDAS Verification Manual = MD174+.
+```

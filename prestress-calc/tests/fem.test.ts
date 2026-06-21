@@ -11,6 +11,8 @@ import { computeInfluenceLine } from "@/engine/fem/influence";
 import { checkSteelMember } from "@/engine/fem/designcheck";
 import { solveFramePDelta } from "@/engine/fem/pdelta";
 import { computeNewmarkSDOF } from "@/engine/timehistory";
+import { computePushover } from "@/engine/fem/pushover";
+import { computeBaseIsolation } from "@/engine/baseisolation";
 
 const E = 200000, b = 200, h = 400, A = b * h, I = (b * h ** 3) / 12;
 
@@ -176,6 +178,43 @@ describe("Strain-compatibility ULS (Naaman) — full & partial", () => {
     const full = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer] });
     const partial = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer, { kind: "RC", A: 2000, d: 1560, Es: 200000, fy: 420 }] });
     expect(partial.Mn).toBeGreaterThan(full.Mn);
+  });
+});
+
+describe("Pushover (plastic-hinge capacity) — MIDAS-style", () => {
+  test("cantilever column: peak base shear ≈ Mp/H", () => {
+    const H = 4000, Mp = 400e6, E = 200000, A = 10000, I = 2e8;
+    const model = {
+      nodes: [{ id: 1, x: 0, y: 0 }, { id: 2, x: 0, y: H }],
+      members: [{ id: 1, n1: 1, n2: 2, E, A, I }],
+      supports: [{ node: 1, ux: true, uy: true, rz: true }],
+      nodalLoads: [], memberLoads: [],
+    };
+    const r = computePushover({ model, refLoads: [{ node: 2, fx: 1 }], Mp, controlNode: 2 });
+    expect(r.Vmax).toBeGreaterThan(0);
+    expect(Math.abs(r.Vmax - Mp / H) / (Mp / H)).toBeLessThan(0.05);
+    expect(r.nHinges).toBeGreaterThanOrEqual(1);
+  });
+  test("capacity curve base shear is non-decreasing", () => {
+    const model = {
+      nodes: [{ id: 1, x: 0, y: 0 }, { id: 2, x: 0, y: 3000 }, { id: 3, x: 5000, y: 3000 }, { id: 4, x: 5000, y: 0 }],
+      members: [{ id: 1, n1: 1, n2: 2, E: 200000, A: 10000, I: 2e8 }, { id: 2, n1: 2, n2: 3, E: 200000, A: 10000, I: 2e8 }, { id: 3, n1: 4, n2: 3, E: 200000, A: 10000, I: 2e8 }],
+      supports: [{ node: 1, ux: true, uy: true, rz: true }, { node: 4, ux: true, uy: true, rz: true }],
+      nodalLoads: [], memberLoads: [],
+    };
+    const r = computePushover({ model, refLoads: [{ node: 2, fx: 1 }], Mp: 300e6, controlNode: 2 });
+    for (let k = 1; k < r.curve.length; k++) expect(r.curve[k].baseShear).toBeGreaterThanOrEqual(r.curve[k - 1].baseShear - 1);
+  });
+});
+
+describe("Base isolation (MIDAS/AASHTO) — period lengthening reduces shear", () => {
+  const r = computeBaseIsolation({ W: 5000, Kiso: 8000, zetaIso: 0.15, Tfixed: 0.5, SDS: 0.8, SD1: 0.4 });
+  test("isolated period longer than fixed-base", () => { expect(r.Tiso).toBeGreaterThan(0.5); });
+  test("isolated base shear reduced vs fixed-base", () => {
+    expect(r.Viso).toBeLessThan(r.Vfixed); expect(r.reductionPct).toBeGreaterThan(0);
+  });
+  test("isolator displacement positive, B>1 for ζ>5%", () => {
+    expect(r.dIso).toBeGreaterThan(0); expect(r.B).toBeGreaterThan(1);
   });
 });
 

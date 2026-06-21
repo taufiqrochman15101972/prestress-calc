@@ -79,27 +79,31 @@ export function solveFramePDelta(model: FrameModel, maxIter = 30, tol = 1e-4): P
   const axialOf = (d: Float64Array) => cache.map(ch => {
     const dg = ch.map.map(g => d[g]); const fl = matVec(ch.kl, matVec(ch.T, dg)); return fl[3]; // tension +
   });
-  const maxDispOf = (d: Float64Array) => { let m = 0; for (let i = 0; i < nodes.length; i++) m = Math.max(m, Math.hypot(d[i * 3], d[i * 3 + 1])); return m; };
+  // directional maxima (axial direction won't amplify; lateral/transverse does)
+  const dispMax = (d: Float64Array) => { let m = 0; for (let i = 0; i < nodes.length; i++) m = Math.max(m, Math.hypot(d[i * 3], d[i * 3 + 1])); return m; };
+  const comp = (d: Float64Array) => { let ux = 0, uy = 0; for (let i = 0; i < nodes.length; i++) { ux = Math.max(ux, Math.abs(d[i * 3])); uy = Math.max(uy, Math.abs(d[i * 3 + 1])); } return { ux, uy }; };
 
   // first order
   let P = members.map(() => 0);
   const d0 = assembleSolve(P);
-  const firstOrderMax = maxDispOf(d0);
+  let dLast = d0;
   P = axialOf(d0);
 
-  let prev = firstOrderMax, secondOrderMax = firstOrderMax, iterations = 0, converged = false, diverged = false;
+  let prev = dispMax(d0), iterations = 0, converged = false, diverged = false;
   for (let it = 1; it <= maxIter; it++) {
     iterations = it;
     let d: Float64Array;
     try { d = assembleSolve(P); } catch { diverged = true; break; }
-    secondOrderMax = maxDispOf(d);
-    if (!isFinite(secondOrderMax) || secondOrderMax > 1e6 * firstOrderMax + 1e6) { diverged = true; break; }
-    if (Math.abs(secondOrderMax - prev) <= tol * Math.abs(secondOrderMax)) { converged = true; break; }
-    prev = secondOrderMax; P = axialOf(d);
+    const md = dispMax(d);
+    if (!isFinite(md) || md > 1e6 * prev + 1e6) { diverged = true; break; }
+    dLast = d;
+    if (Math.abs(md - prev) <= tol * Math.abs(md)) { converged = true; break; }
+    prev = md; P = axialOf(d);
   }
-  return Object.freeze({
-    firstOrderMax, secondOrderMax,
-    amplification: firstOrderMax > 0 ? secondOrderMax / firstOrderMax : 1,
-    iterations, converged, diverged,
-  });
+  // amplification from the lateral component (max of the two translational dirs)
+  const c0 = comp(d0), cf = comp(dLast);
+  const ampX = c0.ux > 1e-9 ? cf.ux / c0.ux : 1, ampY = c0.uy > 1e-9 ? cf.uy / c0.uy : 1;
+  const amplification = diverged ? Infinity : Math.max(ampX, ampY);
+  const firstOrderMax = Math.max(c0.ux, c0.uy), secondOrderMax = Math.max(cf.ux, cf.uy);
+  return Object.freeze({ firstOrderMax, secondOrderMax, amplification, iterations, converged, diverged });
 }

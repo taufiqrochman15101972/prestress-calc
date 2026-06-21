@@ -48,8 +48,10 @@ import { Frame3DCalculator } from "@/components/Frame3DCalculator";
 import { StrainCompatCalculator } from "@/components/StrainCompatCalculator";
 import { InfluenceLineCalculator } from "@/components/InfluenceLineCalculator";
 import { TimeHistoryCalculator } from "@/components/TimeHistoryCalculator";
+import { PushoverCalculator } from "@/components/PushoverCalculator";
+import { BaseIsolationCalculator } from "@/components/BaseIsolationCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation";
 
 interface Props {
   open: boolean;
@@ -298,6 +300,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Elemen balok-kolom 3D 6-DOF/node (aksial + torsi GJ + lentur EIy & EIz), transformasi 3 sumbu, solve & lendutan + gaya batang N/Vy/Vz/T/My/Mz. Tampilan isometrik X→kanan/Y→depan/Z→atas. Divalidasi vs rumus tertutup",
   },
   {
+    key: "pushover",
+    emoji: "📈",
+    title: "Pushover (Sendi Plastis)",
+    subtitle: "Analisis pushover nonlinier-statik (event-to-event sendi plastis, kondensasi statik) — portal didorong lateral, sendi M_p terbentuk berurutan → kurva kapasitas base shear vs perpindahan kontrol sampai mekanisme. Gaya MIDAS pushover (MD55)",
+  },
+  {
+    key: "isolation",
+    emoji: "🛡",
+    title: "Isolasi Dasar & Damper",
+    subtitle: "Desain isolasi seismik (AASHTO Guide Spec Isolation / SNI) — K_iso & ζ_iso memperpanjang perioda → reduksi geser dasar + perpindahan isolator; faktor redaman B, perbandingan fixed-base vs terisolasi (MD60 isolator/damper)",
+  },
+  {
     key: "timehistory",
     emoji: "🌊",
     title: "Time-History Dinamik",
@@ -423,6 +437,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "pushover" && "Pushover nonlinier-statik (gaya MIDAS, MD55) — pola beban lateral diperbesar; metode event-to-event: tiap langkah satu ujung batang mencapai momen plastis M_p → sendi plastis (rilis momen via kondensasi statik) → struktur melunak → ulang sampai mekanisme runtuh (kekakuan singular). Output: kurva kapasitas base shear vs perpindahan kontrol + urutan pembentukan sendi. Sendi elastik-plastis sempurna."}
+          {tab === "isolation" && "Isolasi dasar & damper seismik (AASHTO Guide Spec for Seismic Isolation / SNI, MD60) — lapisan isolasi K_iso + redaman ζ_iso memperpanjang perioda (T_iso=2π√(W/gK_iso)) menjauh dari resonansi → spektrum Sa(T_iso)/B → gaya geser dasar turun; perpindahan isolator d_iso=Sa·g·(T/2π)². Faktor reduksi redaman B=(ζ/0,05)^0,3. Bandingkan fixed-base vs terisolasi → reduksi %."}
           {tab === "timehistory" && "Time-history dinamik linear (integrasi langsung Newmark-β rata-rata percepatan, γ=½ β=¼ stabil tanpa syarat) — osilator SDOF m/k/ζ (mis. pier) di bawah eksitasi gempa-sinus a_g, gaya harmonik, atau pulsa → riwayat u(t), kecepatan, percepatan, puncak & faktor amplifikasi dinamik (resonansi ω≈ωn → DAF≈1/2ζ). Setara fitur time-history MIDAS/Robot; MDOF di atas solver FEM = peningkatan berikutnya."}
           {tab === "influence" && "Garis pengaruh & beban bergerak (MIDAS/Civil-style, MD-1) — beban satuan ditelusuri di sepanjang gelagar memakai solver FEM kita; tiap posisi disolve → ordinat garis pengaruh untuk reaksi R₀, momen tengah M_mid, geser V_mid. Kendaraan multi-gandar lalu digeser → amplop respons maks/min + posisi kritis (Müller-Breslau numerik). Bentang sederhana atau menerus 2-bentang."}
           {tab === "fem3d" && "Rangka ruang 3D (#3) — elemen balok-kolom 3D 2-node 6 DOF/node (u,v,w,θx,θy,θz): aksial EA/L + torsi GJ/L + lentur dua sumbu EIy & EIz, matriks lokal 12×12, transformasi 3 sumbu (direction cosine + up-vector otomatis). Solve via seam backend (Float64Array zero-copy). Tampilan ISOMETRIK X→kanan/Y→depan/Z→atas + triad + lendutan. Divalidasi vs rumus tertutup (kantilever PL³/3EIz & PL³/3EIy, torsi TL/GJ, aksial PL/EA, kolom vertikal)."}
@@ -481,6 +497,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "straincompat" && <StrainCompatCalculator />}
           {tab === "influence" && <InfluenceLineCalculator />}
           {tab === "timehistory" && <TimeHistoryCalculator />}
+          {tab === "pushover" && <PushoverCalculator />}
+          {tab === "isolation" && <BaseIsolationCalculator />}
           {tab === "snieq" && <SeismicSNICalculator />}
           {tab === "cable" && <CableStayedCalculator />}
           {tab === "truss" && <SteelTrussCalculator />}
