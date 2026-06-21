@@ -14,7 +14,8 @@ import { computeNewmarkSDOF } from "@/engine/timehistory";
 import { computePushover } from "@/engine/fem/pushover";
 import { computeBaseIsolation } from "@/engine/baseisolation";
 import { cgBackend } from "@/engine/fem/sparsebackend";
-import { setSolverBackend, denseBackend } from "@/engine/fem/backend";
+import { setSolverBackend, denseBackend, getSolverBackend } from "@/engine/fem/backend";
+import { tryActivateNativeBackend, loadNativeBackend } from "@/engine/fem/nativebackend";
 import { solveShell } from "@/engine/fem/shellsolver";
 import { computeFiberMC } from "@/engine/fibermomentcurvature";
 
@@ -203,6 +204,20 @@ describe("Solver backend (#1) — CG iterative matches dense LU", () => {
     });
     setSolverBackend(denseBackend);
     expect(r.disp[1].uy).toBeCloseTo(-(P * L ** 3) / (3 * Ei * I), 1);
+  });
+});
+
+describe("Native backend bridge (#4) — fails soft without toolchain", () => {
+  test("loadNativeBackend returns null when no compiled lib/koffi present", () => {
+    // No Zig/Julia lib is built in CI/dev → bridge must return null, never throw.
+    expect(loadNativeBackend()).toBeNull();
+  });
+  test("tryActivateNativeBackend reports fallback and leaves backend unchanged", () => {
+    const before = getSolverBackend();
+    const r = tryActivateNativeBackend();
+    expect(r.ok).toBe(false);
+    expect(typeof r.reason).toBe("string");
+    expect(getSolverBackend()).toBe(before); // active backend untouched on failure
   });
 });
 

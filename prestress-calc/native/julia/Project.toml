@@ -1,0 +1,9 @@
+name = "FemSolver"
+uuid = "f3d1a7e2-0b6c-4c1a-9e8d-2a6f0b4c1d77"
+authors = ["PRESTRESS-CALC"]
+version = "0.1.0"
+
+# Build dependency (not a runtime dep of the compiled lib):
+#   ] add PackageCompiler
+[compat]
+julia = "1.9"

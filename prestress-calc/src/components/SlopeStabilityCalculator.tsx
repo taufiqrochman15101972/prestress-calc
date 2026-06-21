@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import { infiniteSlopeFS, slopeSlicesFS } from "@/engine/slopestability";
+import { computeConsolidation } from "@/engine/consolidation";
+import { triaxialFailure } from "@/engine/mohrcoulomb";
 
 function Nf({ label, unit, value, onChange, step = 1 }: { label: string; unit?: string; value: number; onChange: (v: number) => void; step?: number; }) {
   return (
@@ -26,8 +28,14 @@ const f = (v: number, d = 2) => (isFinite(v) ? v.toFixed(d) : "—");
 export function SlopeStabilityCalculator() {
   const [inf, setInf] = useState({ c: 5, phi: 30, gamma: 18, z: 3, beta: 22, seepage: false });
   const [sl, setSl] = useState({ H: 10, beta: 30, c: 20, phi: 20, gamma: 18, ru: 0, xc: 10, yc: 16, R: 18 });
+  const [cons, setCons] = useState({ H: 4, drainage: "double" as "double" | "single", cv: 1.5, Cc: 0.3, e0: 0.9, sigma0: 100, dSigma: 100, t: 2 });
+  const [tx, setTx] = useState({ c: 0, phi: 30, sigma3: 100 });
   const fsInf = useMemo(() => infiniteSlopeFS(inf), [inf]);
   const r = useMemo(() => slopeSlicesFS(sl), [sl]);
+  const cr = useMemo(() => computeConsolidation(cons), [cons]);
+  const txr = useMemo(() => triaxialFailure(tx), [tx]);
+  const sc2 = (k: keyof typeof cons, v: number | string) => setCons(p => ({ ...p, [k]: v }));
+  const st = (k: keyof typeof tx, v: number) => setTx(p => ({ ...p, [k]: v }));
   const si = (k: keyof typeof inf, v: number | boolean) => setInf(p => ({ ...p, [k]: v }));
   const ss = (k: keyof typeof sl, v: number) => setSl(p => ({ ...p, [k]: v }));
 
@@ -76,6 +84,43 @@ export function SlopeStabilityCalculator() {
         <Chk label="FS Fellenius (ordinary)" fs={r.FS_fellenius} />
         {!r.valid && <p className="text-[10px] text-amber-700">Lingkaran tak memotong lereng dengan benar — sesuaikan x_c, y_c, R.</p>}
         <p className="text-[9px] text-gray-500 leading-snug">Metode irisan busur lingkaran (Bishop iteratif & Fellenius). Geser x_c/y_c/R mencari FS minimum (lingkaran kritis). FS≥1,5 lazimnya disyaratkan untuk lereng permanen.</p>
+
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+          {/* Terzaghi 1-D consolidation */}
+          <div className="space-y-1">
+            <p className="text-[9px] font-bold text-gray-500 uppercase">Konsolidasi 1-D (Terzaghi)</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <Nf label="H" unit="m" value={cons.H} step={0.5} onChange={v => sc2("H", v)} />
+              <Nf label="cv" unit="m²/yr" value={cons.cv} step={0.1} onChange={v => sc2("cv", v)} />
+              <Nf label="t" unit="yr" value={cons.t} step={0.5} onChange={v => sc2("t", v)} />
+              <Nf label="Cc" value={cons.Cc} step={0.02} onChange={v => sc2("Cc", v)} />
+              <Nf label="e₀" value={cons.e0} step={0.05} onChange={v => sc2("e0", v)} />
+              <label className="flex items-center gap-1 text-[9px] mt-3"><input type="checkbox" checked={cons.drainage === "double"} onChange={e => sc2("drainage", e.target.checked ? "double" : "single")} />2-arah</label>
+              <Nf label="σ'₀" unit="kPa" value={cons.sigma0} step={10} onChange={v => sc2("sigma0", v)} />
+              <Nf label="Δσ'" unit="kPa" value={cons.dSigma} step={10} onChange={v => sc2("dSigma", v)} />
+            </div>
+            <div className="text-[10px] font-mono bg-slate-50 border border-gray-200 rounded p-1.5 space-y-0.5">
+              <div>Tv = {f(cr.Tv, 3)} → U = <b>{f(cr.U * 100, 1)}%</b></div>
+              <div>S_c = {f(cr.Sc * 1000, 1)} mm · S(t) = <b>{f(cr.St * 1000, 1)} mm</b></div>
+              <div className="text-gray-500">t₅₀ = {f(cr.t50, 2)} · t₉₀ = {f(cr.t90, 2)} yr</div>
+            </div>
+          </div>
+          {/* Mohr–Coulomb triaxial */}
+          <div className="space-y-1">
+            <p className="text-[9px] font-bold text-gray-500 uppercase">Triaksial Mohr-Coulomb (saat runtuh)</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <Nf label="c" unit="kPa" value={tx.c} step={5} onChange={v => st("c", v)} />
+              <Nf label="φ" unit="°" value={tx.phi} step={1} onChange={v => st("phi", v)} />
+              <Nf label="σ₃" unit="kPa" value={tx.sigma3} step={10} onChange={v => st("sigma3", v)} />
+            </div>
+            <div className="text-[10px] font-mono bg-slate-50 border border-gray-200 rounded p-1.5 space-y-0.5">
+              <div>Kp = tan²(45+φ/2) = {f(txr.Kp, 3)}</div>
+              <div>σ₁f = σ₃·Kp + 2c√Kp = <b>{f(txr.sigma1f, 1)} kPa</b></div>
+              <div>q_f = σ₁f − σ₃ = <b>{f(txr.qf, 1)} kPa</b> · τ_f = {f(txr.tauf, 1)} kPa</div>
+            </div>
+            <p className="text-[9px] text-gray-500 leading-snug">Verifikasi konstitutif MIDAS GTS (MMC): c=0, φ=30°, σ₃=100 → q_f=200 kPa (acuan mutlak).</p>
+          </div>
+        </div>
       </div>
     </div>
   );
