@@ -1,0 +1,17 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch({ executablePath:"C:/Program Files/Google/Chrome/Application/chrome.exe", headless:true, args:["--no-sandbox"] });
+const page = await browser.newPage();
+await page.setViewportSize({ width: 1600, height: 1000 });
+const click = async (s)=>{ await page.click(s).catch(()=>{}); await page.waitForTimeout(700); };
+await page.goto("http://localhost:3000",{waitUntil:"networkidle",timeout:30000});
+await page.waitForTimeout(2200);
+await click('button:has-text("Pre-T")');
+await click('button:has-text("Kehilangan")');
+await page.waitForTimeout(600);
+await page.screenshot({ path:"new_03-pretensioned-losses.png", clip:{x:278,y:75,width:670,height:420} });
+console.log("pretensioned OK");
+await click('button:has-text("🔗 PT")');
+await page.waitForTimeout(600);
+await page.screenshot({ path:"new_04-posttensioned-losses.png", clip:{x:278,y:75,width:670,height:420} });
+console.log("posttensioned OK");
+await browser.close();
