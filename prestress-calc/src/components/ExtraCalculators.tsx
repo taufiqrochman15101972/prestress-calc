@@ -52,8 +52,11 @@ import { PushoverCalculator } from "@/components/PushoverCalculator";
 import { BaseIsolationCalculator } from "@/components/BaseIsolationCalculator";
 import { FiberMCCalculator } from "@/components/FiberMCCalculator";
 import { ShellSolverCalculator } from "@/components/ShellSolverCalculator";
+import { SlopeStabilityCalculator } from "@/components/SlopeStabilityCalculator";
+import { ShellReinfCalculator } from "@/components/ShellReinfCalculator";
+import { UmatCalculator } from "@/components/UmatCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation" | "fibermc" | "shellsolve";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation" | "fibermc" | "shellsolve" | "slope" | "shellreinf" | "umat";
 
 interface Props {
   open: boolean;
@@ -302,6 +305,24 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Elemen balok-kolom 3D 6-DOF/node (aksial + torsi GJ + lentur EIy & EIz), transformasi 3 sumbu, solve & lendutan + gaya batang N/Vy/Vz/T/My/Mz. Tampilan isometrik X→kanan/Y→depan/Z→atas. Divalidasi vs rumus tertutup",
   },
   {
+    key: "slope",
+    emoji: "⛰",
+    title: "Stabilitas Lereng",
+    subtitle: "Faktor keamanan lereng (MIDAS GTS, MD482) — lereng tak-hingga (translasi, ±seepage) & busur lingkaran metode irisan Bishop simplified + Fellenius; sketsa lereng + bidang gelincir, FS≥1,5",
+  },
+  {
+    key: "shellreinf",
+    emoji: "◫",
+    title: "Tulangan Shell (Sandwich)",
+    subtitle: "Desain tulangan beton shell dari 8 resultan tegangan (n_x/n_y/n_xy + m_x/m_y/m_xy) — metode sandwich IASS (Medwadowski-Samartin) + Baumann/CEB, As tiap muka & arah; mengambil hasil solver shell ▣ (file 253)",
+  },
+  {
+    key: "umat",
+    emoji: "⚗",
+    title: "UMAT Material (USSR)",
+    subtitle: "Antarmuka user-material 1D (MIDAS GTS USSR / ABAQUS UMAT, file 255) — σ(ε)+tangen E_t: linear, beton Hognestad nonlinear-elastik, baja elasto-plastis + hardening; uji kurva σ–ε & colok ke serat M–φ / truss-fiber",
+  },
+  {
     key: "fibermc",
     emoji: "🧵",
     title: "Fiber Moment-Curvature (UMAT)",
@@ -451,6 +472,9 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "umat" && "Antarmuka USER-MATERIAL (UMAT) 1D — MIDAS GTS User-Supplied-Subroutine (file 255) / ABAQUS UMAT: rutin konstitutif yang dari regangan mengembalikan tegangan σ DAN modulus tangen E_t. Pustaka: linear elastik, beton Hognestad (nonlinear-elastik, parabola→softening→crushing), baja elasto-plastis bilinear (+isotropic hardening E_h). Uji kurva σ–ε (peak, ε@peak) lalu dicolok ke serat penampang (M–φ 🧵) & elemen truss/fiber-frame — memperkaya nonlinier material."}
+          {tab === "slope" && "Stabilitas lereng (geoteknik, MIDAS GTS — MD482): (1) lereng tak-hingga translasi FS=[c+γz cos²β tanφ]/[γz sinβ cosβ] (kasus kering & seepage sejajar lereng); (2) busur lingkaran metode irisan — Fellenius (ordinary) & Bishop's Simplified (iteratif) untuk lereng seragam + lingkaran coba lewat toe, irisan otomatis, pore-pressure ru. Geser pusat/jari-jari cari lingkaran kritis (FS min). Verifikasi FS=tanφ/tanβ (kohesi nol)."}
+          {tab === "shellreinf" && "Desain tulangan beton shell (file 253 IASS, Medwadowski & Samartin 'Design of Reinforcement in Concrete Shells: A Unified Approach') dari 8 resultan tegangan (membran n_x,n_y,n_xy + lentur m_x,m_y,m_xy): metode SANDWICH — shell diganti 2 lapis baja di lengan z=t−2·cover, tiap muka diberi triad membran n±m/z, tulangan via aturan Baumann/CEB As·fy=n+|n_xy| (tekan dipangkas). Hasil As_x/As_y tiap muka (mm²/m). Mengambil resultan dari solver shell ▣."}
           {tab === "fibermc" && "Momen-kurvatur nonlinier metode SERAT dgn hukum material pengguna (UMAT-style, MD120): penampang dipotong jadi serat beton (Hognestad f=f'c[2ε/ε0−(ε/ε0)²] + softening + crushing εcu) & lapis baja (elastik-plastis ±fy); tiap kurvatur φ, regangan atas dicari Newton-Raphson agar ΣF=N → kurva M–φ (retak→leleh→ultimit), daktilitas μ_φ=φu/φy. Basis fiber-pushover & nonlinier material. Divalidasi M_u≈As·fy·(d−a/2)."}
           {tab === "shellsolve" && "Shell 3D PENUH (#2) — rakit & solve elemen flat-shell Q4 6-DOF/node (u,v,w,θx,θy,θz) = membran bilinear (2×2 Gauss) + pelat Mindlin Selective-Reduced-Integration (bebas shear-locking) + drilling, 24×24/elemen. Tekanan keluar-bidang → lendutan w; tarik tepi → regangan membran u. Permukaan lendutan isometrik berwarna. Divalidasi vs teori pelat (w≈α·q·a⁴/D) & membran (u≈N·a/EA)."}
           {tab === "pushover" && "Pushover nonlinier-statik (gaya MIDAS, MD55) — pola beban lateral diperbesar; metode event-to-event: tiap langkah satu ujung batang mencapai momen plastis M_p → sendi plastis (rilis momen via kondensasi statik) → struktur melunak → ulang sampai mekanisme runtuh (kekakuan singular). Output: kurva kapasitas base shear vs perpindahan kontrol + urutan pembentukan sendi. Sendi elastik-plastis sempurna."}
@@ -513,6 +537,9 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "straincompat" && <StrainCompatCalculator />}
           {tab === "influence" && <InfluenceLineCalculator />}
           {tab === "timehistory" && <TimeHistoryCalculator />}
+          {tab === "umat" && <UmatCalculator />}
+          {tab === "slope" && <SlopeStabilityCalculator />}
+          {tab === "shellreinf" && <ShellReinfCalculator />}
           {tab === "fibermc" && <FiberMCCalculator />}
           {tab === "shellsolve" && <ShellSolverCalculator />}
           {tab === "pushover" && <PushoverCalculator />}

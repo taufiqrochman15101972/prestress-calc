@@ -1593,3 +1593,33 @@ FIBER M-φ (UMAT): slice section into concrete fibers (Hognestad+softening+crush
   + steel layers (elastoplastic); for each φ Newton on top strain so ΣF=N;
   M=Σf·A·(yc−y). M-φ curve → My, Mu, ductility. Verify Mu≈As·fy·(d−a/2).
 ```
+
+---
+
+## Skill: slope-shell-reinf (geotech slope + shell reinforcement)
+
+```
+name: slope-shell-reinf
+description: >
+  Slope stability (engine/slopestability.ts: infinite-slope + circular Bishop/
+  Fellenius method of slices, tab ⛰, MIDAS GTS MD482) and concrete-shell
+  reinforcement design (engine/shellreinf.ts: IASS sandwich + Baumann/CEB from
+  the 8 stress resultants, tab ◫, file 253). Trigger on: slope stability, factor
+  of safety, method of slices, Bishop, Fellenius, landslide, shell reinforcement,
+  Wood-Armer, sandwich method, shell rebar.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+SLOPE infinite: FS=[c+γz cos²β tanφ]/[γz sinβ cosβ]; seepage → γ' on friction term.
+  Verify cohesionless FS=tanφ/tanβ.
+SLOPE slices: uniform slope (toe flat, slope 0..B, crest H), trial circle (xc,yc,R);
+  per slice W=γ·b·h, α=asin((xm−xc)/R), u=ru·γ·h. Fellenius FS=Σ[cl+(Wcosα−ul)tanφ]/
+  Σ(Wsinα); Bishop iterate FS=Σ[(cb+(W−ub)tanφ)/mα]/Σ(Wsinα), mα=cosα(1+tanα tanφ/FS).
+SHELL reinf (sandwich): z=t−2cover; face membrane n*=n/2±m/z; Baumann As·fy=n+|nxy|
+  (compression clamped, revised off-diag). As(mm²/m)=F/fy×1000 each face & direction.
+  Verify pure tension → As split both faces; pure bending → tension face only.
+```
