@@ -1623,3 +1623,37 @@ SHELL reinf (sandwich): z=t−2cover; face membrane n*=n/2±m/z; Baumann As·fy=
   (compression clamped, revised off-diag). As(mm²/m)=F/fy×1000 each face & direction.
   Verify pure tension → As split both faces; pure bending → tension face only.
 ```
+
+---
+
+## Skill: building-seismic (ASCE 7-16 / NEHRP ELF + Eurocode 8)
+
+```
+name: building-seismic
+description: >
+  BUILDING (multi-storey) seismic design — engine/buildingseismic.ts, tab 🏙️.
+  ASCE 7-16 / NEHRP (FEMA P-750, FEMA 451) Equivalent Lateral Force §11.4+§12.8
+  plus a parallel Eurocode 8 (EN 1998-1) lateral-force path. DISTINCT from the
+  bridge seismic modules (seismic.ts single-mode, sni2833seismic.ts bridge
+  spectrum, seismicdynamics.ts pier capacity, baseisolation.ts). Source = GM (1)
+  + GM (118)–(256) earthquake-engineering library. Trigger on: building seismic,
+  ELF, base shear, ASCE 7, NEHRP, FEMA, design response spectrum, SDS, SD1,
+  story drift, P-Delta stability, Eurocode 8, behaviour factor q, IBC seismic.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+RULE: FEMA/EC8 are DESIGN-EXAMPLE docs → take procedure only, NOT the example
+  numbers. Assert the closed-form CODE EQUATIONS (identities) in tests.
+SPECTRUM (ASCE 7-16): SDS=⅔Fa·Ss, SD1=⅔Fv·S1, T0=0.2SD1/SDS, TS=SD1/SDS;
+  Sa: T<T0→SDS(0.4+0.6T/T0); T0..TS→SDS; TS..TL→SD1/T; >TL→SD1·TL/T².
+BASE SHEAR: Ta=Ct·hn^x (system table); Cs=SDS/(R/Ie) capped SD1/(T·R/Ie),
+  floor max(0.044·SDS·Ie, 0.01; +0.5·S1/(R/Ie) if S1≥0.6g); V=Cs·W.
+DISTRIBUTION: k=1(T≤0.5)..2(T≥2.5) linear; Fx=(wx·hx^k/Σwi·hi^k)·V; Vx=Σ above.
+DRIFT/P-Δ: δx=Cd·δxe/Ie; Δ/hsx ≤ Δa; θ=Px·Δ·Ie/(Vx·hsx·Cd) ≤ θmax=min(0.5/Cd,0.25).
+EC8: Sd(T) EN1998-1 §3.2.2.5 (plateau ag·S·2.5/q, lower bound β·ag); Fb=Sd(T1)·W·λ.
+VERIFY: SDS=⅔Fa·Ss; ΣCvx=1 & ΣFx=V; spectrum branches; EC8 plateau; Fb.
+```

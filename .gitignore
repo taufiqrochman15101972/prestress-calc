@@ -46,6 +46,18 @@ prestress-calc/kong_*.png
 *.xlsx
 *.docx
 /[0-9]*.txt
+*.dwg
+*.DWG
+*.dxf
+*.DXF
+*.gif
+*.chm
+*.html
+/MD (*)
+/GM (*)
+/SP (*)
+/CSiBridge*_files/
+dxf_export/
 
 # Local agent/IDE config with machine-specific paths & permissions
 .claude/settings.local.json

@@ -64,21 +64,26 @@ Your only job is to read generated values and assert they are within ±0.5% of t
 5. Flag any assertion exceeding **0.5%** with `✗ FAIL — exceeds tolerance`.
 6. Do **not** suggest fixes — only report findings. Return control to the lead session.
 
-### Reference Targets (PRD §10)
+### Reference Targets (PRD §10 — engine-verified; supersedes the original PRD typos)
 
 | Assertion | Reference Value | Unit |
 |---|---|---|
 | A_g | 535,000 | mm² |
-| y_b | 721.5 | mm |
-| y_t | 928.5 | mm |
-| I_g | 1.942 × 10¹¹ | mm⁴ |
+| y_b | 769.86 | mm |
+| y_t | 880.14 | mm |
+| I_g | 1.7746 × 10¹¹ | mm⁴ |
 | n_c | 0.7746 | — |
-| A_c | 860,332 | mm² |
-| y_bc | 1,110.8 | mm |
-| I_c | 4.105 × 10¹¹ | mm⁴ |
-| f_ps | 1,710.5 | MPa |
-| a (Whitney) | 145.2 | mm |
-| M_n | 7.23 × 10⁹ | N·mm |
+| A_c | 860,331 | mm² |
+| y_bc | 1,140.5 | mm |
+| I_c | 3.7290 × 10¹¹ | mm⁴ |
+| f_ps | 1,822.2 | MPa |
+| a (Whitney) | 120.91 | mm |
+| M_n | 1.081 × 10¹⁰ | N·mm |
+
+**Benchmark/verification families (assert engine output to absolute closed-form/code values, small tolerance):**
+- FEM vs theory (`tests/benchmark.test.ts`): fixed-fixed wL⁴/384EI, prop 3wL/8, Euler buckling π²EI/L², 2-DOF eigen golden-ratio.
+- Geotech (`tests/geotech_verif.test.ts`): Terzaghi U–Tv (0.197/0.848), Mohr-Coulomb q_f=200, bearing Nc=5.14/Nq=18.40.
+- Building seismic (`tests/buildingseismic.test.ts`): ASCE 7-16 spectrum/Cs/V/ΣCvx=1 identities + EC8 plateau (FEMA/EC8 numbers are example-only → assert the code equations, not the worked examples).
 
 ---
 
