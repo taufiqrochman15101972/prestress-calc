@@ -74,7 +74,11 @@ export function InputPanel() {
     updateLoads, updateImmediateLoss, updatePartialPrestress, updateFoundation,
     addTendonRow, removeTendonRow, updateTendonRow,
     saveToLocal, loadFromLocal,
+    settings, setWorkflowMode, setDesignScope,
   } = useDesignStore();
+  const workflow = settings.workflowMode ?? "DIRECT";
+  const scope = settings.designScope ?? "FULL";
+  const dm = inputs.loads.directMoments ?? { enabled: false, Mg: 0, Msdl: 0, Mlive: 0 };
 
   const { projectInfo, girder, deck, material, tendon, loads, immediateLoss, partialPrestress, foundation } = inputs;
   const [saveMsg, setSaveMsg] = React.useState("");
@@ -116,6 +120,36 @@ export function InputPanel() {
       {/* Header */}
       <div className="flex-none px-3 py-2 bg-blue-700 text-white">
         <p className="font-bold text-xs uppercase tracking-wide">Parameter Input</p>
+      </div>
+
+      {/* ── Mode Desain (workflow + scope) ── */}
+      <SectionBar>Mode Desain</SectionBar>
+      <div className="px-3 py-2 space-y-2">
+        <div>
+          <Label>Alur Kerja</Label>
+          <div className="grid grid-cols-2 gap-1 mt-0.5">
+            <button onClick={() => setWorkflowMode("DIRECT")}
+              className={`px-1.5 py-1 rounded text-[9.5px] border leading-tight ${workflow === "DIRECT" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>
+              Langsung desain<br /><span className="text-[8px] opacity-80">(punya bentang/gaya dalam)</span></button>
+            <button onClick={() => setWorkflowMode("ANALYSIS_FIRST")}
+              className={`px-1.5 py-1 rounded text-[9.5px] border leading-tight ${workflow === "ANALYSIS_FIRST" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>
+              Mulai analisis<br /><span className="text-[8px] opacity-80">(FEM → desain)</span></button>
+          </div>
+        </div>
+        <div>
+          <Label>Lingkup</Label>
+          <div className="grid grid-cols-2 gap-1 mt-0.5">
+            <button onClick={() => setDesignScope("FULL")}
+              className={`px-1.5 py-1 rounded text-[9.5px] border ${scope === "FULL" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-600 border-gray-300"}`}>Desain lengkap</button>
+            <button onClick={() => setDesignScope("STRESS_ONLY")}
+              className={`px-1.5 py-1 rounded text-[9.5px] border ${scope === "STRESS_ONLY" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-600 border-gray-300"}`}>Cek tegangan saja</button>
+          </div>
+        </div>
+        {workflow === "ANALYSIS_FIRST" && (
+          <p className="text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-1.5 leading-snug">
+            Buka 🔧 → 🧮/🧊 FEM Modeler, susun model &amp; solve, lalu klik “→ kirim gaya ke desain girder” untuk mengisi momen di bawah.
+          </p>
+        )}
       </div>
 
       {/* ── Info Proyek ── */}
@@ -458,6 +492,28 @@ export function InputPanel() {
           onChange={(v) => updateLoads({ relativeHumidity: v })} />
         <NumField label="Tu Torsi" unit="kN·m" value={loads.tuTorsion} min={0} step={10}
           onChange={(v) => updateLoads({ tuTorsion: v })} />
+      </div>
+      <div className="px-3 pb-2">
+        <div className="flex items-center gap-2">
+          <input id="dm-on" type="checkbox" checked={dm.enabled}
+            onChange={(e) => updateLoads({ directMoments: { ...dm, enabled: e.target.checked } })} className="h-3.5 w-3.5" />
+          <label htmlFor="dm-on" className="text-[10px] text-gray-700 font-medium">Input gaya dalam (momen) langsung</label>
+        </div>
+        {dm.enabled ? (
+          <>
+            <div className="grid grid-cols-3 gap-2 mt-1.5">
+              <NumField label="M_g" unit="kN·m" value={dm.Mg} step={50}
+                onChange={(v) => updateLoads({ directMoments: { ...dm, Mg: v } })} />
+              <NumField label="M_sdl" unit="kN·m" value={dm.Msdl} step={50}
+                onChange={(v) => updateLoads({ directMoments: { ...dm, Msdl: v } })} />
+              <NumField label="M_live" unit="kN·m" value={dm.Mlive} step={50}
+                onChange={(v) => updateLoads({ directMoments: { ...dm, Mlive: v } })} />
+            </div>
+            <p className="text-[9px] text-gray-400 mt-1">Momen ini dipakai langsung (tanpa qL²/8). Untuk data dari analisis struktur sendiri / FEM.</p>
+          </>
+        ) : (
+          <p className="text-[9px] text-gray-400 mt-1">Momen dihitung otomatis dari beban &amp; bentang (qL²/8). Centang untuk memasukkan momen hasil analisis sendiri.</p>
+        )}
       </div>
 
       {/* ── Konfigurasi Bentang ── */}

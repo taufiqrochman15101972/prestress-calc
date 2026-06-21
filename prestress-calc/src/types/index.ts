@@ -107,6 +107,9 @@ export interface LoadConfig {
   eTorsionArm?: number;
   /** Number of spans (1 = simply supported, 2 or 3 = continuous) */
   nSpans?: 1 | 2 | 3;
+  /** Direct internal-force input (when the user already has M from analysis /
+   *  another source) — bypasses the qL²/8 derivation. Moments in kN·m. */
+  directMoments?: { enabled: boolean; Mg: number; Msdl: number; Mlive: number };
 }
 
 export interface ImmediateLossParams {
@@ -178,6 +181,11 @@ export interface AppSettings {
   formulaVariant: FormulaVariant;
   /** Construction method — defaults to POST_TENSIONED (prioritized). */
   prestressSystem: PrestressSystem;
+  /** Workflow: DIRECT = design straight from span/forces (no structural analysis);
+   *  ANALYSIS_FIRST = run FEM analysis then design. */
+  workflowMode?: "DIRECT" | "ANALYSIS_FIRST";
+  /** Scope: FULL design (SLS+ULS+shear+deflection+…) vs STRESS_ONLY (SLS check). */
+  designScope?: "FULL" | "STRESS_ONLY";
 }
 
 // ─── Engine Result Interfaces ────────────────────────────────

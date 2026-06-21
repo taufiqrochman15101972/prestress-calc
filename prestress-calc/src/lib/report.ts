@@ -210,6 +210,7 @@ export function openPrintReport(
   const totalLossMpa = p.deltaFR + p.deltaAS + p.deltaES + td.deltaFpLT;
   const etaLoss      = (totalLossMpa / p.jackingStressMpa) * 100;
   const showKernel   = settings?.formulaVariant === "KERNEL";
+  const stressOnly   = settings?.designScope === "STRESS_ONLY";
   const beamClassLabels: Record<string, string> = {
     U: "Class U — Prategang Penuh (0.50√f'c)",
     T: "Class T — Prategang Sebagian Transisi (1.00√f'c)",
@@ -457,7 +458,7 @@ ${section("8. Kontrol SLS — Tegangan Serat", `
   </table>
 `)}
 
-${twoCol(
+${stressOnly ? `<div class="note-box">Lingkup: <b>CEK TEGANGAN SAJA (SLS)</b> — kontrol ULS lentur/geser & detailing kekuatan disembunyikan. Pilih “Desain lengkap” untuk menampilkan semuanya.</div>` : twoCol(
   section("9. Kontrol ULS Lentur (φ = 0.90)", `
     <div class="sub-title">Kapasitas Lentur — ACI §20.3.2.4</div>
     ${table(

@@ -111,6 +111,7 @@ const defaultLoads: LoadConfig = {
   tuTorsion: 0,
   eTorsionArm: 1.5,
   nSpans: 1,
+  directMoments: { enabled: false, Mg: 0, Msdl: 0, Mlive: 0 },
 };
 
 const defaultImmediateLoss: ImmediateLossParams = {
@@ -129,6 +130,8 @@ const defaultSettings: AppSettings = {
   unitSystem: "SI",
   formulaVariant: "STANDARD",
   prestressSystem: "POST_TENSIONED", // prioritized default
+  workflowMode: "DIRECT",            // design straight from span/forces
+  designScope: "FULL",
 };
 
 // ─── Tendon resolver ─────────────────────────────────────────
@@ -170,6 +173,8 @@ interface DesignStore {
   setUnitSystem: (s: UnitSystem) => void;
   setFormulaVariant: (v: FormulaVariant) => void;
   setPrestressSystem: (s: PrestressSystem) => void;
+  setWorkflowMode: (m: "DIRECT" | "ANALYSIS_FIRST") => void;
+  setDesignScope: (s: "FULL" | "STRESS_ONLY") => void;
 
   // Persistence
   saveToLocal: () => void;
@@ -219,9 +224,11 @@ function runPipeline(
 
   // Moments
   const wSelf    = loads.gammaConc * gross.areaAg * 1e-6;
-  const Mg       = wSelf * LM ** 2 / 8;
-  const Msdl     = loads.wSDL  * LM ** 2 / 8;
-  const Mlive    = loads.wLive * LM ** 2 / 8;
+  // Direct internal-force input (have M from analysis) bypasses the qL²/8 derivation.
+  const dm = loads.directMoments;
+  const Mg       = dm?.enabled ? dm.Mg   : wSelf * LM ** 2 / 8;
+  const Msdl     = dm?.enabled ? dm.Msdl : loads.wSDL  * LM ** 2 / 8;
+  const Mlive    = dm?.enabled ? dm.Mlive: loads.wLive * LM ** 2 / 8;
   const Mservice = Mg + Msdl + Mlive;
   const Mu       = 1.25 * (Mg + Msdl) + 1.75 * Mlive;
   const moments  = Object.freeze({ wSelf, Mg, Msdl, Mlive, Mservice, Mu });
@@ -741,6 +748,8 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     set((st) => ({ settings: { ...st.settings, prestressSystem: s } }));
     get().compute();
   },
+  setWorkflowMode: (m) => set((st) => ({ settings: { ...st.settings, workflowMode: m } })),
+  setDesignScope: (s) => set((st) => ({ settings: { ...st.settings, designScope: s } })),
   saveToLocal: () => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
@@ -771,6 +780,8 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
         unitSystem:      ps.unitSystem      ?? defaultSettings.unitSystem,
         formulaVariant:  ps.formulaVariant  ?? defaultSettings.formulaVariant,
         prestressSystem: ps.prestressSystem ?? defaultSettings.prestressSystem,
+        workflowMode:    ps.workflowMode    ?? defaultSettings.workflowMode,
+        designScope:     ps.designScope     ?? defaultSettings.designScope,
       };
       set({ inputs: merged, settings: mergedSettings });
       get().compute();

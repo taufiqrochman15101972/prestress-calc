@@ -5,6 +5,7 @@ import { solveFrame, type FrameModel, type FemNode, type FemMember } from "@/eng
 import { linearRepeat, mirror, rotateCopy, deflectedShape } from "@/engine/fem/model";
 import { checkSteelMember } from "@/engine/fem/designcheck";
 import { solveFramePDelta } from "@/engine/fem/pdelta";
+import { useDesignStore } from "@/store/useDesignStore";
 
 // ── default portal frame (STAAD-like: page opens pre-filled, not blank) ──
 const DEFAULT: FrameModel = {
@@ -31,6 +32,8 @@ export function FemModelerCalculator() {
 
   const [dc, setDc] = useState({ on: false, Fy: 250, d: 400 });   // design check (steel)
   const [pdOn, setPdOn] = useState(false);                        // P-Δ second-order
+  const updateLoads = useDesignStore(s => s.updateLoads);
+  const [sentMsg, setSentMsg] = useState("");
 
   const result = useMemo(() => {
     try { return { r: solveFrame(model), err: "" }; }
@@ -274,6 +277,14 @@ export function FemModelerCalculator() {
               {pd && <span className="font-mono text-gray-700">δ₁={f(pd.firstOrderMax, 2)} → δ₂={f(pd.secondOrderMax, 2)} mm · <b style={{ color: pd.diverged ? "#dc2626" : "#1d4ed8" }}>amplifikasi {pd.diverged ? "∞ (tekuk!)" : "×" + f(pd.amplification, 3)}</b> ({pd.iterations} iter)</span>}
             </div>
             <p className="text-[9px] text-gray-400">Cek desain & P-Δ memakai gaya batang dari solver FEM (gaya MIDAS/Robot). Rasio &gt;1 = tidak memenuhi (merah).</p>
+            {r && <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => {
+                const maxM = Math.max(...r.members.flatMap(m => m.samples.map(s => Math.abs(s.M)))) / 1e6;
+                updateLoads({ directMoments: { enabled: true, Mg: 0, Msdl: 0, Mlive: +maxM.toFixed(1) } });
+                setSentMsg(`M maks ${maxM.toFixed(1)} kN·m → desain girder (sbg M_live, input langsung aktif).`);
+              }} className="px-2 py-1 rounded bg-emerald-600 text-white text-[10px] hover:bg-emerald-700">→ kirim gaya ke desain girder</button>
+              {sentMsg && <span className="text-[9px] text-emerald-700">{sentMsg}</span>}
+            </div>}
           </div>
         </div>
       </div>
