@@ -50,8 +50,10 @@ import { InfluenceLineCalculator } from "@/components/InfluenceLineCalculator";
 import { TimeHistoryCalculator } from "@/components/TimeHistoryCalculator";
 import { PushoverCalculator } from "@/components/PushoverCalculator";
 import { BaseIsolationCalculator } from "@/components/BaseIsolationCalculator";
+import { FiberMCCalculator } from "@/components/FiberMCCalculator";
+import { ShellSolverCalculator } from "@/components/ShellSolverCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation" | "fibermc" | "shellsolve";
 
 interface Props {
   open: boolean;
@@ -300,6 +302,18 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Elemen balok-kolom 3D 6-DOF/node (aksial + torsi GJ + lentur EIy & EIz), transformasi 3 sumbu, solve & lendutan + gaya batang N/Vy/Vz/T/My/Mz. Tampilan isometrik X→kanan/Y→depan/Z→atas. Divalidasi vs rumus tertutup",
   },
   {
+    key: "fibermc",
+    emoji: "🧵",
+    title: "Fiber Moment-Curvature (UMAT)",
+    subtitle: "Momen-kurvatur nonlinier metode serat dengan hukum material pengguna (Hognestad beton + crushing, baja elastik-plastis) — Newton-Raphson kesetimbangan aksial tiap kurvatur → kurva M–φ (retak→leleh→ultimit), daktilitas. Basis pushover fiber & nonlinier material (MD120)",
+  },
+  {
+    key: "shellsolve",
+    emoji: "▣",
+    title: "Shell 3D Penuh (FEM)",
+    subtitle: "Rakit & solve shell datar 6-DOF/node (membran bilinear + pelat Mindlin-SRI bebas shear-locking + drilling) — tekanan→lentur w & tarik tepi→membran u, permukaan lendutan isometrik. Divalidasi vs teori pelat & membran",
+  },
+  {
     key: "pushover",
     emoji: "📈",
     title: "Pushover (Sendi Plastis)",
@@ -437,6 +451,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
+          {tab === "fibermc" && "Momen-kurvatur nonlinier metode SERAT dgn hukum material pengguna (UMAT-style, MD120): penampang dipotong jadi serat beton (Hognestad f=f'c[2ε/ε0−(ε/ε0)²] + softening + crushing εcu) & lapis baja (elastik-plastis ±fy); tiap kurvatur φ, regangan atas dicari Newton-Raphson agar ΣF=N → kurva M–φ (retak→leleh→ultimit), daktilitas μ_φ=φu/φy. Basis fiber-pushover & nonlinier material. Divalidasi M_u≈As·fy·(d−a/2)."}
+          {tab === "shellsolve" && "Shell 3D PENUH (#2) — rakit & solve elemen flat-shell Q4 6-DOF/node (u,v,w,θx,θy,θz) = membran bilinear (2×2 Gauss) + pelat Mindlin Selective-Reduced-Integration (bebas shear-locking) + drilling, 24×24/elemen. Tekanan keluar-bidang → lendutan w; tarik tepi → regangan membran u. Permukaan lendutan isometrik berwarna. Divalidasi vs teori pelat (w≈α·q·a⁴/D) & membran (u≈N·a/EA)."}
           {tab === "pushover" && "Pushover nonlinier-statik (gaya MIDAS, MD55) — pola beban lateral diperbesar; metode event-to-event: tiap langkah satu ujung batang mencapai momen plastis M_p → sendi plastis (rilis momen via kondensasi statik) → struktur melunak → ulang sampai mekanisme runtuh (kekakuan singular). Output: kurva kapasitas base shear vs perpindahan kontrol + urutan pembentukan sendi. Sendi elastik-plastis sempurna."}
           {tab === "isolation" && "Isolasi dasar & damper seismik (AASHTO Guide Spec for Seismic Isolation / SNI, MD60) — lapisan isolasi K_iso + redaman ζ_iso memperpanjang perioda (T_iso=2π√(W/gK_iso)) menjauh dari resonansi → spektrum Sa(T_iso)/B → gaya geser dasar turun; perpindahan isolator d_iso=Sa·g·(T/2π)². Faktor reduksi redaman B=(ζ/0,05)^0,3. Bandingkan fixed-base vs terisolasi → reduksi %."}
           {tab === "timehistory" && "Time-history dinamik linear (integrasi langsung Newmark-β rata-rata percepatan, γ=½ β=¼ stabil tanpa syarat) — osilator SDOF m/k/ζ (mis. pier) di bawah eksitasi gempa-sinus a_g, gaya harmonik, atau pulsa → riwayat u(t), kecepatan, percepatan, puncak & faktor amplifikasi dinamik (resonansi ω≈ωn → DAF≈1/2ζ). Setara fitur time-history MIDAS/Robot; MDOF di atas solver FEM = peningkatan berikutnya."}
@@ -497,6 +513,8 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "straincompat" && <StrainCompatCalculator />}
           {tab === "influence" && <InfluenceLineCalculator />}
           {tab === "timehistory" && <TimeHistoryCalculator />}
+          {tab === "fibermc" && <FiberMCCalculator />}
+          {tab === "shellsolve" && <ShellSolverCalculator />}
           {tab === "pushover" && <PushoverCalculator />}
           {tab === "isolation" && <BaseIsolationCalculator />}
           {tab === "snieq" && <SeismicSNICalculator />}

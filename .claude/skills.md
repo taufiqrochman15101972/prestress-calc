@@ -1561,3 +1561,35 @@ BENCHMARK vs theory: fixed-fixed δ=wL⁴/384EI M=wL²/12; propped 3wL/8; 2-span
   Euler Pcr=π²EI/L² (pin) & π²EI/4L² (cantilever) [Gere&Timoshenko]; 2-DOF equal m,k
   → ω²=(3∓√5)/2·k/m [Greenwood]. MIDAS Verification Manual = MD174+.
 ```
+
+---
+
+## Skill: cg-backend-shell-fiber (iterative solver + full shell + fiber UMAT)
+
+```
+name: cg-backend-shell-fiber
+description: >
+  Iterative CG solver backend (engine/fem/sparsebackend.ts cgBackend via the
+  SolverBackend seam — native-ready), full flat-shell assembly+solve
+  (engine/fem/shellsolver.ts, 6 DOF/node membrane+plate+drilling, tab ▣), and
+  fiber moment-curvature UMAT nonlinear material (engine/fibermomentcurvature.ts,
+  Hognestad + elastoplastic steel, Newton on top strain, tab 🧵). Refs MD430-469
+  MIDAS, SP1-12 CSiBridge. Trigger on: iterative solver, conjugate gradient,
+  sparse backend, full shell assembly, membrane, fiber section, moment curvature,
+  UMAT, nonlinear material, M-phi.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+CG backend: PCG (Jacobi M=diag(K)); register via setSolverBackend(cgBackend);
+  K/F Float64Array (pointer/zero-copy) — native Julia/Zig swaps in same API.
+SHELL solve: mesh Q4 flatShellK (24×24, node DOF u,v,w,θx,θy,θz), scatter;
+  pressure→w (−q·Ae/4), edge tension→u; BC: fix θz all (no drilling), w=0 (SS)
+  /+θ (clamp) on edges, u=v=0 at x=0 wall. Verify w≈α·q·a⁴/D, u≈N·a/EA.
+FIBER M-φ (UMAT): slice section into concrete fibers (Hognestad+softening+crush)
+  + steel layers (elastoplastic); for each φ Newton on top strain so ΣF=N;
+  M=Σf·A·(yc−y). M-φ curve → My, Mu, ductility. Verify Mu≈As·fy·(d−a/2).
+```

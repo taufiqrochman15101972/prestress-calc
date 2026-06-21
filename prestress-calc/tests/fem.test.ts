@@ -13,6 +13,10 @@ import { solveFramePDelta } from "@/engine/fem/pdelta";
 import { computeNewmarkSDOF } from "@/engine/timehistory";
 import { computePushover } from "@/engine/fem/pushover";
 import { computeBaseIsolation } from "@/engine/baseisolation";
+import { cgBackend } from "@/engine/fem/sparsebackend";
+import { setSolverBackend, denseBackend } from "@/engine/fem/backend";
+import { solveShell } from "@/engine/fem/shellsolver";
+import { computeFiberMC } from "@/engine/fibermomentcurvature";
 
 const E = 200000, b = 200, h = 400, A = b * h, I = (b * h ** 3) / 12;
 
@@ -178,6 +182,54 @@ describe("Strain-compatibility ULS (Naaman) — full & partial", () => {
     const full = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer] });
     const partial = computeStrainCompatibility({ b: 600, h: 1650, fc: 50, layers: [psLayer, { kind: "RC", A: 2000, d: 1560, Es: 200000, fy: 420 }] });
     expect(partial.Mn).toBeGreaterThan(full.Mn);
+  });
+});
+
+describe("Solver backend (#1) — CG iterative matches dense LU", () => {
+  test("CG solves a small SPD system exactly", () => {
+    const K = new Float64Array([4, 1, 1, 3]);
+    const x = cgBackend.solve(K, 2, new Float64Array([1, 2]));
+    expect(x[0]).toBeCloseTo(1 / 11, 6);
+    expect(x[1]).toBeCloseTo(7 / 11, 6);
+  });
+  test("frame solved via CG backend == closed-form (then restore dense)", () => {
+    setSolverBackend(cgBackend);
+    const L = 5000, P = 10000, Ei = 200000, A = 80000, I = 1.067e9;
+    const r = solveFrame({
+      nodes: [{ id: 1, x: 0, y: 0 }, { id: 2, x: L, y: 0 }],
+      members: [{ id: 1, n1: 1, n2: 2, E: Ei, A, I }],
+      supports: [{ node: 1, ux: true, uy: true, rz: true }],
+      nodalLoads: [{ node: 2, fy: -P }], memberLoads: [],
+    });
+    setSolverBackend(denseBackend);
+    expect(r.disp[1].uy).toBeCloseTo(-(P * L ** 3) / (3 * Ei * I), 1);
+  });
+});
+
+describe("Full flat-shell assembly (#2)", () => {
+  test("pure pressure → out-of-plane deflection near plate theory", () => {
+    const r = solveShell({ a: 4000, b: 4000, nx: 8, ny: 8, t: 200, E: 25000, nu: 0.3, qz: 0.01, edgeN: 0, edge: "SS" });
+    const D = (25000 * 200 ** 3) / (12 * (1 - 0.09));
+    const wTheory = -(0.00406 * 0.01 * 4000 ** 4) / D;
+    expect(r.centerW).toBeLessThan(0);
+    expect(Math.abs(r.centerW - wTheory) / Math.abs(wTheory)).toBeLessThan(0.25);
+  });
+  test("pure in-plane tension → membrane elongation ≈ N·a/(E·b·t)", () => {
+    const N = 1e6, a = 4000, b = 4000, t = 200, E = 25000;
+    const r = solveShell({ a, b, nx: 6, ny: 6, t, E, nu: 0.3, qz: 0, edgeN: N, edge: "SS" });
+    expect(r.uEnd).toBeCloseTo((N * a) / (E * b * t), 1);
+  });
+});
+
+describe("Fiber moment-curvature / UMAT (#3)", () => {
+  test("singly-reinforced beam M_u ≈ As·fy·(d−a/2), ductile", () => {
+    const b = 300, h = 500, fc = 30, As = 1500, d = 450, fy = 420, Es = 200000;
+    const r = computeFiberMC({ b, h, fc, bars: [{ A: As, d, Es, fy }] });
+    const a = (As * fy) / (0.85 * fc * b);
+    const MuTheory = As * fy * (d - a / 2);
+    expect(Math.abs(r.Mu - MuTheory) / MuTheory).toBeLessThan(0.15);
+    expect(r.curve.length).toBeGreaterThan(5);
+    expect(r.ductility).toBeGreaterThan(1);
   });
 });
 
