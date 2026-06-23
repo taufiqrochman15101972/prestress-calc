@@ -1701,3 +1701,40 @@ VERIFY: E_D=4Fy(um−uy); ξ_eq=(2/π)(1−1/μ); F capped ±Fy; post-yield k1=�
   Bouc-Wen z_max; Takeda degraded loop < non-degraded; elastic μ≈1 vs yield μ>1 &
   E_H>0; Park-Ang terms; Mainstone θ/λ1/a/k/V.
 ```
+
+## Skill: limit-analysis (yield-line + plastic collapse + concrete plasticity)
+
+```
+name: limit-analysis
+description: >
+  LIMIT ANALYSIS & PLASTICITY collapse design — engine/limitanalysis.ts, tab ⚖️.
+  UPPER-bound (kinematic) side of plasticity: Johansen yield-line theory for RC
+  two-way slabs, plastic collapse of beams (mechanism loads), Nielsen concrete
+  effectiveness factor ν + plastic (web-crushing) shear, and the bound-theorem
+  classifier. COMPLEMENTS strut-and-tie ▽ (the LOWER-bound/static/safe side) and
+  elastic plate FEM ▦. Source = ASM 1–92 applied-solid-mechanics library
+  (Nielsen & Hoang "Limit Analysis and Concrete Plasticity" ×3, Johansen,
+  plastic theory, computational plasticity). Trigger on: yield line, limit
+  analysis, plastic collapse, mechanism load, plastic hinge, Johansen, slab
+  ultimate load, effectiveness factor, lower/upper bound, concrete plasticity.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+RULE: ASM books are textbooks → formulas/procedure only, NOT example numbers.
+  Assert exact closed-form limit-analysis IDENTITIES in tests.
+YIELD-LINE (rect slab UDL, bottom m, edge ratio i=m'/m):
+  w_u=(24·m/Lx²)(1+i)/[√(3+(Lx/Ly)²)−Lx/Ly]²  (Lx=short). mRequired = inverse.
+  exact: square SS 24m/L², fixed i=1 → 48m/L²; 1-way SS 8 / fixed 16 ·m/Lx².
+PLASTIC BEAM COLLAPSE (mechanism): UDL SS 8Mp/L², fixed 16Mp/L², propped 11.657Mp/L²
+  (root of (wL/2−Mps/L)²=2wMp); point-mid SS 4Mp/L, fixed 8Mp/L, propped 6Mp/L.
+CONCRETE PLASTICITY (Nielsen): ν=0.7−fc/200 (clamp 0.4–1); τ=ν·fc·sinθcosθ
+  (max ½ν·fc @45°); V_plastic=τ·bw·z.
+BOUNDS: static/lower = SAFE (strut-and-tie); kinematic/upper = UNSAFE, lowest
+  mechanism governs (yield-line). They coincide at the true plastic limit load.
+VERIFY: slab 24/48 m/L²; 1-way 8/16; beam UDL 8/16/11.657; point 4/8/6; ν & V
+  plastic; mRequired round-trip; bound safe/unsafe flags.
+```

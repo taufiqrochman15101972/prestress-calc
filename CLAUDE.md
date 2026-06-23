@@ -24,6 +24,7 @@ Pustaka referensi bernomor (semua sudah ditinjau — ambil prosedur/urutan, buka
 - **`MD (1)`–`MD (522)`** (+`.chm` biner, `.jpg/.gif` gambar) — MIDAS technical refs/Gen+Civil tutorials + **MIDAS FEA Verification Manual** (MD174+, angka = acuan mutlak) + MIDAS GTS/DIANA geoteknik (470–522).
 - **`SP (1)`–`SP (12)`** + `CSiBridge Enhancements….html` — CSiBridge.
 - **`GM (1)`, `GM (118)`–`GM (272)`** — pustaka **rekayasa gempa BANGUNAN GEDUNG**: FEMA 451 / P-750 NEHRP, ASCE 7-10/7-16, IBC 2012, Eurocode 8, isolasi seismik (Naeim & Kelly), analisis nonlinier (NIST/PEER/ATC), ACI 318-19, strut-and-tie, SNI/BSN. **GM 257–272 = model histeresis & dinamika nonlinier** (Bouc-Wen/Takeda/T(x), ENGLTHA degradasi+pinching, asesmen energi kolom RC/Park-Ang, kinerja siklik sambungan pracetak EC8, RC berisi dinding bata PEER/FEMA 356) → `hysteresis.ts` 🔄.
+- **`ASM (1)`–`ASM (92)`** — pustaka **mekanika padat terapan / metode variasional / teori FEM / plastisitas & analisis batas**: Megson, Washizu (variational elasticity/plasticity), Zienkiewicz FEM, de Souza Neto/Owen (computational plasticity), Lubliner, **Nielsen & Hoang "Limit Analysis and Concrete Plasticity" (3×)**, Johansen yield-line, energy/calculus-of-variations. Mayoritas memvalidasi ekosistem FEM/UMAT/fiber/strain-compat eksisting; gap = analisis batas plastis → `limitanalysis.ts` ⚖️.
 - **`*.dwg`** (54 file shop-drawing AutoCAD biner; dibaca via konverter DWG→DXF terpasang) + **`O1.pdf`–`O10.pdf`** (acuan gaya output OriginPro) + **`A/B/C.pdf`** + `*.png` (rujukan dasar GAMBAR output DED) + `gambar ALLPLAN.xlsx`, `170.xls`, `174.jpg`, `123.ppm`.
 
 ## Project Overview
@@ -35,7 +36,7 @@ Pustaka referensi bernomor (semua sudah ditinjau — ambil prosedur/urutan, buka
 **Module map** — engine modules live in `src/engine/` (each = pure function → `Object.freeze`), surfaced as tabs in `ExtraCalculators.tsx`. The full annotated catalog (what each module computes, its source book, its tab emoji) is maintained in `PRD Prategang.md` and the memory files. By domain:
 - **Core girder (5-layer):** `section` · `tendon` · `losses` · `sls` · `uls` (see architecture below).
 - **Superstructure variants:** `boxgirder` 🌉 · `bridgeload` 🚚 · `segmental` 🏗 · `external` 🪢 · `splicedgirder` 🧩 · `madecontinuous` ⛓️ · `rcgirder` 🧱 (ordinary RC T-beam) · `continuous`.
-- **Detailing / SLS-ULS add-ons:** `mcft` (sectional shear + long-rebar tie) · `straincompat` 🎚 · `fatigue` 🔁 · `curvedtendon` ➰ · `transversept` 🔲 · `strutandtie` ▽ · `deckslab` 🛞 · `diffshrinkage` 💧 · `development` · `torsion` · `anchorage`.
+- **Detailing / SLS-ULS add-ons:** `mcft` (sectional shear + long-rebar tie) · `straincompat` 🎚 · `fatigue` 🔁 · `curvedtendon` ➰ · `transversept` 🔲 · `strutandtie` ▽ (lower-bound/static) · `limitanalysis` ⚖️ (upper-bound/kinematic: yield-line + plastic collapse + ν) · `deckslab` 🛞 · `diffshrinkage` 💧 · `development` · `torsion` · `anchorage`.
 - **Long-term:** `aemm` ⏳ · `creepshrinkage` 🕰 · `handling` 🏭 · `lateralstability` 🌀.
 - **Substructure & foundation (ordinary RC):** `substructure` 🏛️ · `pilefoundation`/`foundationdynamics` 🪨 · `consolidation`+`mohrcoulomb`+`slopestability` ⛰ · `shellreinf` ◫.
 - **Seismic:** bridge → `seismic` 🌐 · `sni2833seismic` 🌎 · `seismicdynamics` 🌋 · `baseisolation` 🛡; **building → `buildingseismic` 🏙️ (ASCE 7-16/NEHRP ELF + Eurocode 8, GM library)**; **nonlinear cyclic → `hysteresis` 🔄 (bilinear/Bouc-Wen/Takeda + nonlinear Newmark TH + Park-Ang + infill strut, GM 257–272).**
@@ -198,6 +199,21 @@ Nonlinear TH:  Newmark-β (γ=½,β=¼) + Newton on g(u)=p − m·a − c·v −
 Park-Ang damage:  DI = μ/μ_cap + β_PA·E_H/(Fy·u_u),  u_u = μ_cap·u_y
 Infill strut (Mainstone/FEMA 356):  λ1 = [Em·t·sin2θ/(4·Ec·Icol·h_inf)]^¼ ,
    a = 0.175·(λ1·h_col)^(−0.4)·r_inf
+```
+
+### Limit analysis & plasticity (`limitanalysis.ts`)
+
+```
+Yield-line (Johansen), rectangular slab UDL, bottom m, edge ratio i=m'/m:
+   w_u = (24·m/Lx²)·(1+i) / [√(3+(Lx/Ly)²) − Lx/Ly]²
+   (exact: square SS=24m/L², fixed i=1→48m/L²; 1-way SS=8/fixed=16·m/Lx²)
+Plastic beam collapse (mechanism load):
+   UDL:  SS 8·Mp/L² , fixed 16·Mp/L² , propped 11.657·Mp/L²
+   point-mid:  SS 4·Mp/L , fixed 8·Mp/L , propped 6·Mp/L
+Concrete plasticity (Nielsen):  ν = 0.7 − fc/200  (clamp 0.4–1) ;
+   plastic shear τ = ν·fc·sinθ·cosθ (max ½ν·fc @45°) ; V = τ·bw·z
+Bound theorems:  static/lower = SAFE (strut-and-tie) ; kinematic/upper =
+   UNSAFE, lowest mechanism governs (yield-line)
 ```
 
 ---
