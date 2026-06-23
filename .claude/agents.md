@@ -86,6 +86,8 @@ Your only job is to read generated values and assert they are within ±0.5% of t
 - Building seismic (`tests/buildingseismic.test.ts`): ASCE 7-16 spectrum/Cs/V/ΣCvx=1 identities + EC8 plateau (FEMA/EC8 numbers are example-only → assert the code equations, not the worked examples).
 - Hysteresis/cyclic (`tests/hysteresis.test.ts`): closed-form identities E_D=4Fy(um−uy), ξ_eq=(2/π)(1−1/μ), elasto-plastic F capped ±Fy, post-yield k1=αk0, Bouc-Wen z_max=(A/(β+γ))^(1/n), Takeda degraded loop < non-degraded, Park-Ang DI terms, Mainstone strut λ1/a (GM 257–272 textbook numbers are NOT references → assert the model equations).
 - Limit analysis/plasticity (`tests/limitanalysis.test.ts`): exact identities yield-line slab 24/48·m/L² & 1-way 8/16·m/Lx², plastic beam collapse UDL 8/16/11.657·Mp/L² & point 4/8/6·Mp/L, Nielsen ν=0.7−fc/200 & V_plastic, mRequired round-trip, lower(safe)/upper(unsafe) bounds (ASM 1–92 textbook numbers NOT references → assert the closed-form theorems).
+- Modal dynamics/RSA (`tests/modaldynamics.test.ts`): 2-DOF golden ω²=(k/m)(3∓√5)/2, uniform N-story ωₙ=2√(k/m)sin((2n−1)π/(2(2N+1))), mass-orthonormality, ΣMₙ*=Mtot, flat-spectrum ΣVₙ=Sa·Mtot, CQC≈SRSS for separated modes (DS 1–96 textbook numbers NOT references).
+- Force method/three-moment (`tests/forcemethod.test.ts`): 2-span M_B=wL²/8 & R_B=1.25wL & R_A=3wL/8, ΣR=Σw·L, 1-span→SS, propped 3wL/8, fixed-fixed wL²/12 (MTH 1–116 textbook numbers NOT references; cross-checks stiffness-method FEM).
 
 ---
 

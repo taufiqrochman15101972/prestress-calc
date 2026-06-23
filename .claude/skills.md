@@ -1738,3 +1738,64 @@ BOUNDS: static/lower = SAFE (strut-and-tie); kinematic/upper = UNSAFE, lowest
 VERIFY: slab 24/48 m/L²; 1-way 8/16; beam UDL 8/16/11.657; point 4/8/6; ν & V
   plastic; mRequired round-trip; bound safe/unsafe flags.
 ```
+
+## Skill: modal-dynamics (N-DOF eigen + Response Spectrum Analysis)
+
+```
+name: modal-dynamics
+description: >
+  GENERAL N-DOF modal analysis & Response Spectrum Analysis — engine/
+  modaldynamics.ts, tab 📳. Generalized eigenproblem Kφ=ω²Mφ (Cholesky + Jacobi),
+  participation factors, effective modal mass, RSA with SRSS & CQC. Reuses the
+  ASCE design spectrum (buildingseismic.ts). COMPLEMENTS linear SDOF time-history
+  🌊 and the 2-DOF bridge modal (seismicdynamics.ts). Source = DS 1–96 structural-
+  dynamics library (Chopra, Craig & Kurdila, Gupta, Wilson, Paz, Humar). Trigger
+  on: modal analysis, mode shape, eigenvalue, natural frequency, response
+  spectrum, RSA, SRSS, CQC, participation factor, effective modal mass.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+RULE: DS books are textbooks → formulas only, NOT example numbers. Assert exact
+  closed-form modal identities.
+EIGEN: K φ = ω² M φ → Cholesky M=LLᵀ; Ã=L⁻¹KL⁻ᵀ (symmetric); Jacobi cyclic;
+  φ=L⁻ᵀψ (mass-orthonormal φᵀMφ=1). shearBuilding → M diag, K tridiagonal.
+MODAL: Γₙ=φᵀM r/φᵀM φ; Mₙ*=(φᵀM r)²/φᵀM φ; ΣMₙ*=Σmᵢ; cum ratio ≥0.9 (ASCE §12.9).
+RSA: uₙ=Γₙφₙ·Sa(Tₙ)/ωₙ²; fₙ=Γₙ M φₙ·Sa(Tₙ); base Vₙ=ΣfₙPass Sa in m/s² (=Sa_g·9.81).
+COMBINE: SRSS=√Σrₙ²; CQC ρᵢⱼ=8ζ²(1+r)r^1.5/[(1−r²)²+4ζ²r(1+r)²], r=ωᵢ/ωⱼ.
+VERIFY: 2-DOF golden ω²=(k/m)(3∓√5)/2; uniform N-story ωₙ=2√(k/m)sin((2n−1)π/(2(2N+1)));
+  mass-orthonormality; ΣMₙ*=Mtot; flat-spectrum ΣVₙ=Sa·Mtot; CQC≈SRSS separated.
+```
+
+## Skill: force-method (matrix flexibility + three-moment)
+
+```
+name: force-method
+description: >
+  MATRIX FORCE (flexibility) METHOD & three-moment equation — engine/
+  forcemethod.ts, tab 🔢. The classical dual of the stiffness/displacement method
+  (which already powers the FEM ecosystem): Clapeyron three-moment for continuous
+  beams, generic flexibility redundants [f]{X}=−{Δ0}, classic indeterminate
+  closed forms. Cross-validates the stiffness-method FEM. Source = MTH 1–116
+  matrix-structural-analysis library (Przemieniecki, Azar, Paz, Weaver & Gere).
+  Trigger on: force method, flexibility method, three-moment, Clapeyron,
+  continuous beam, redundant, statically indeterminate, support moment.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+RULE: MTH books are textbooks → formulas only, NOT example numbers.
+THREE-MOMENT (UDL, simple ends M0=MN=0):
+  M_{i−1}Lᵢ+2Mᵢ(Lᵢ+Lᵢ₊₁)+M_{i+1}Lᵢ₊₁ = −¼(wᵢLᵢ³+wᵢ₊₁Lᵢ₊₁³) → tridiagonal solve.
+REACTIONS: R_left=wL/2+(M_right−M_left)/L; R_right=wL/2+(M_left−M_right)/L.
+  mid moment = wL²/8+(M_left+M_right)/2.
+FORCE CORE: [f]{X}=−{Δ0}. Classics: propped 3wL/8 & Mfix=wL²/8; fixed-fixed wL²/12.
+VERIFY: 2-span M_B=wL²/8 & R_B=1.25wL & R_A=3wL/8; ΣR=Σw·L; 1-span→SS (mid wL²/8);
+  propped 3wL/8; fixed-fixed wL²/12. Results match the stiffness-method FEM.
+```

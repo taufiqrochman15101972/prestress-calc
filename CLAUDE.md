@@ -25,6 +25,8 @@ Pustaka referensi bernomor (semua sudah ditinjau — ambil prosedur/urutan, buka
 - **`SP (1)`–`SP (12)`** + `CSiBridge Enhancements….html` — CSiBridge.
 - **`GM (1)`, `GM (118)`–`GM (272)`** — pustaka **rekayasa gempa BANGUNAN GEDUNG**: FEMA 451 / P-750 NEHRP, ASCE 7-10/7-16, IBC 2012, Eurocode 8, isolasi seismik (Naeim & Kelly), analisis nonlinier (NIST/PEER/ATC), ACI 318-19, strut-and-tie, SNI/BSN. **GM 257–272 = model histeresis & dinamika nonlinier** (Bouc-Wen/Takeda/T(x), ENGLTHA degradasi+pinching, asesmen energi kolom RC/Park-Ang, kinerja siklik sambungan pracetak EC8, RC berisi dinding bata PEER/FEMA 356) → `hysteresis.ts` 🔄.
 - **`ASM (1)`–`ASM (92)`** — pustaka **mekanika padat terapan / metode variasional / teori FEM / plastisitas & analisis batas**: Megson, Washizu (variational elasticity/plasticity), Zienkiewicz FEM, de Souza Neto/Owen (computational plasticity), Lubliner, **Nielsen & Hoang "Limit Analysis and Concrete Plasticity" (3×)**, Johansen yield-line, energy/calculus-of-variations. Mayoritas memvalidasi ekosistem FEM/UMAT/fiber/strain-compat eksisting; gap = analisis batas plastis → `limitanalysis.ts` ⚖️.
+- **`DS (1)`–`DS (96)`** — pustaka **dinamika struktur & rekayasa gempa**: Chopra, Craig & Kurdila, Gupta "Response Spectrum Method", Wilson "3-D Static & Dynamic Analysis" (CQC), Paz, Humar, Clough & Penzien, Anderson & Naeim. Gap = analisis modal N-DOF umum + RSA multi-modus → `modaldynamics.ts` 📳.
+- **`MTH (1)`–`MTH (116)`** — pustaka **analisis struktur matriks & metode numerik/komputasi**: Przemieniecki "Theory of Matrix Structural Analysis", Azar, Mario Paz "Integrated Matrix Analysis", Weaver & Gere, Hartmann + Maple/MATLAB/Mathcad/numerical-methods. Metode kekakuan = fondasi FEM eksisting; gap = metode GAYA (fleksibilitas) & tiga-momen → `forcemethod.ts` 🔢. (File MTH 117–182 & FEM 1–47 belum ada di folder.)
 - **`*.dwg`** (54 file shop-drawing AutoCAD biner; dibaca via konverter DWG→DXF terpasang) + **`O1.pdf`–`O10.pdf`** (acuan gaya output OriginPro) + **`A/B/C.pdf`** + `*.png` (rujukan dasar GAMBAR output DED) + `gambar ALLPLAN.xlsx`, `170.xls`, `174.jpg`, `123.ppm`.
 
 ## Project Overview
@@ -40,7 +42,7 @@ Pustaka referensi bernomor (semua sudah ditinjau — ambil prosedur/urutan, buka
 - **Long-term:** `aemm` ⏳ · `creepshrinkage` 🕰 · `handling` 🏭 · `lateralstability` 🌀.
 - **Substructure & foundation (ordinary RC):** `substructure` 🏛️ · `pilefoundation`/`foundationdynamics` 🪨 · `consolidation`+`mohrcoulomb`+`slopestability` ⛰ · `shellreinf` ◫.
 - **Seismic:** bridge → `seismic` 🌐 · `sni2833seismic` 🌎 · `seismicdynamics` 🌋 · `baseisolation` 🛡; **building → `buildingseismic` 🏙️ (ASCE 7-16/NEHRP ELF + Eurocode 8, GM library)**; **nonlinear cyclic → `hysteresis` 🔄 (bilinear/Bouc-Wen/Takeda + nonlinear Newmark TH + Park-Ang + infill strut, GM 257–272).**
-- **Analysis ecosystem (FEM/FEA):** `fem/` (core LU + CG sparse backend + native seam) · frame 2D 🧮 · frame3d 🧊 · plate ▦ · shellsolver ▣ · influence 📉 · pushover 📈 · timehistory 🌊 (linear) · `hysteresis` 🔄 (nonlinear) · fibermomentcurvature 🧵 · `umat` ⚗ · `pdelta`/`designcheck`.
+- **Analysis ecosystem (FEM/FEA):** `fem/` (core LU + CG sparse backend + native seam) · frame 2D 🧮 · frame3d 🧊 · plate ▦ · shellsolver ▣ · influence 📉 · pushover 📈 · timehistory 🌊 (linear) · `hysteresis` 🔄 (nonlinear) · `modaldynamics` 📳 (N-DOF eigen + RSA SRSS/CQC) · `forcemethod` 🔢 (matrix flexibility + three-moment) · fibermomentcurvature 🧵 · `umat` ⚗ · `pdelta`/`designcheck`.
 - **Other structures:** `cablestayed` 🪢 · `steeltruss` 🔺 · `specialmembers` 🧪 (pipe/pole/sleeper) · tank/column/slab/corbel/dapped/bearing/grade.
 - **Output & I/O:** `designsheet`/`SectionDiagram` 📋 (DED drawing) · `internalforces` 📊 · `dxfimport`+`dwgConvert` 📐 · `presets`/`strands` 📚 · `optimization` 💰 · `rating` 🏷 · `fireresistance` 🔥 · `distribution` 🛤 · Supabase save/load.
 
@@ -214,6 +216,27 @@ Concrete plasticity (Nielsen):  ν = 0.7 − fc/200  (clamp 0.4–1) ;
    plastic shear τ = ν·fc·sinθ·cosθ (max ½ν·fc @45°) ; V = τ·bw·z
 Bound theorems:  static/lower = SAFE (strut-and-tie) ; kinematic/upper =
    UNSAFE, lowest mechanism governs (yield-line)
+```
+
+### Modal analysis & Response Spectrum (`modaldynamics.ts`)
+
+```
+Generalized eigen K φ = ω² M φ : Cholesky M=LLᵀ → Ã=L⁻¹KL⁻ᵀ → Jacobi → φ=L⁻ᵀψ
+Participation Γₙ = φₙᵀM r / φₙᵀM φₙ ; effective mass Mₙ* = (φₙᵀM r)²/(φₙᵀM φₙ)
+   ΣMₙ* = total mass ; include modes to ΣMₙ*/M ≥ 0.9 (ASCE §12.9)
+RSA: modal disp uₙ = Γₙ φₙ·Sa(Tₙ)/ωₙ² ; floor force fₙ = Γₙ M φₙ·Sa(Tₙ)
+Combination: SRSS = √(Σ rₙ²) ; CQC = √(ΣΣ ρᵢⱼ rᵢ rⱼ),
+   ρᵢⱼ = 8ζ²(1+r)r^1.5 / [(1−r²)²+4ζ²r(1+r)²], r=ωᵢ/ωⱼ  (reuse ASCE spectrum)
+```
+
+### Matrix force method & three-moment (`forcemethod.ts`)
+
+```
+Three-moment (Clapeyron), continuous beam UDL, simple ends M0=MN=0:
+   M_{i−1}Lᵢ + 2Mᵢ(Lᵢ+Lᵢ₊₁) + M_{i+1}Lᵢ₊₁ = −¼(wᵢLᵢ³ + wᵢ₊₁Lᵢ₊₁³)
+Reactions:  R_left = wL/2 + (M_right−M_left)/L ;  R_right = wL/2 + (M_left−M_right)/L
+Force method core:  [f]{X} = −{Δ0}  (redundants).  Classics: propped 3wL/8,
+   fixed-fixed Mend=wL²/12.  Cross-checks the stiffness-method FEM.
 ```
 
 ---
