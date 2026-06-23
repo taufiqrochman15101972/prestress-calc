@@ -1657,3 +1657,47 @@ DRIFT/P-Δ: δx=Cd·δxe/Ie; Δ/hsx ≤ Δa; θ=Px·Δ·Ie/(Vx·hsx·Cd) ≤ θm
 EC8: Sd(T) EN1998-1 §3.2.2.5 (plateau ag·S·2.5/q, lower bound β·ag); Fb=Sd(T1)·W·λ.
 VERIFY: SDS=⅔Fa·Ss; ΣCvx=1 & ΣFx=V; spectrum branches; EC8 plateau; Fb.
 ```
+
+## Skill: hysteresis-cyclic (nonlinear hysteresis + cyclic/seismic response)
+
+```
+name: hysteresis-cyclic
+description: >
+  NONLINEAR hysteretic cyclic & seismic response — engine/hysteresis.ts, tab 🔄.
+  Rate-independent hysteresis constitutive models (bilinear kinematic via
+  return-mapping, Bouc-Wen smooth, Takeda RC degrading-stiffness + pinching);
+  F–u loop tracing with dissipated energy E_D + equivalent viscous damping ξ_eq;
+  NONLINEAR time-history (Newmark-β + Newton-Raphson) → ductility μ, hysteretic
+  energy, residual displacement; Park-Ang energy-based damage index; Mainstone/
+  FEMA-356 masonry-infill equivalent diagonal strut. COMPLEMENTS the LINEAR
+  timehistory.ts 🌊 and pushover.ts/seismicdynamics.ts. Source = GM 257–272
+  (Bouc-Wen/Takeda/T(x) models, ENGLTHA degradation, Park-Ang energy assessment,
+  EC8 precast connections, PEER/FEMA-356 infilled RC). Trigger on: hysteresis,
+  cyclic, Bouc-Wen, Takeda, pinching, stiffness/strength degradation, nonlinear
+  time-history, ductility demand, equivalent damping, Park-Ang, infill strut.
+tools: [read, write, bash]
+model: sonnet
+```
+
+### Task Protocol
+
+```
+RULE: GM 257–272 are textbooks/theses/journals → procedure/model only, NOT their
+  example numbers. Assert closed-form IDENTITIES in tests.
+BILINEAR (kinematic, return-mapping): H_d=α·k0/(1−α); k1=α·k0.
+  F_trial=F+k0·Δu; f=|F_trial−q|−Fy; if f>0: Δu_p=f/(k0+H_d),
+  F=F_trial−k0·sgn·Δu_p, q+=H_d·sgn·Δu_p. Elasto-plastic α=0 ⇒ F capped ±Fy.
+BOUC-WEN: ż=A·u̇−β|u̇||z|^(n−1)z−γ·u̇|z|^n; F=α·k0·u+(1−α)·Fy·z (z dimensionless,
+  normalized by u_y=Fy/k0); monotonic saturation z_max=(A/(β+γ))^(1/n).
+TAKEDA: unloading k_unl=k0·(u_y/u_max)^β_s·pinch, clamped to bilinear envelope.
+ENERGY/DAMPING: E_D=∮F du over a CLOSED steady cycle (+a→−a→+a); k_sec=Fmax/a;
+  ξ_eq=E_D/(4π·½·k_sec·a²); elasto-plastic ⇒ ξ_eq=(2/π)(1−1/μ).
+NONLINEAR TH: Newmark γ=½,β=¼; Newton on g(u)=p−m·a−c·v−F_int(u);
+  k_eff=m/(βΔt²)+c·γ/(βΔt)+k_T; μ=u_peak/u_y.
+PARK-ANG: DI=μ/μ_cap+β_PA·E_H/(Fy·u_u), u_u=μ_cap·u_y.
+INFILL STRUT (Mainstone/FEMA 356): λ1=[Em·t·sin2θ/(4·Ec·Icol·h_inf)]^¼;
+  a=0.175·(λ1·h_col)^(−0.4)·r_inf; A=a·t; k_lat=A·Em·cos²θ/r.
+VERIFY: E_D=4Fy(um−uy); ξ_eq=(2/π)(1−1/μ); F capped ±Fy; post-yield k1=αk0;
+  Bouc-Wen z_max; Takeda degraded loop < non-degraded; elastic μ≈1 vs yield μ>1 &
+  E_H>0; Park-Ang terms; Mainstone θ/λ1/a/k/V.
+```

@@ -56,8 +56,9 @@ import { SlopeStabilityCalculator } from "@/components/SlopeStabilityCalculator"
 import { ShellReinfCalculator } from "@/components/ShellReinfCalculator";
 import { UmatCalculator } from "@/components/UmatCalculator";
 import { BuildingSeismicCalculator } from "@/components/BuildingSeismicCalculator";
+import { HysteresisCalculator } from "@/components/HysteresisCalculator";
 
-type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation" | "fibermc" | "shellsolve" | "slope" | "shellreinf" | "umat" | "bldgeq";
+type ExtraTab = "pile" | "column" | "slab" | "tank" | "tension" | "corbel" | "dapped" | "bearing" | "grade" | "box" | "load" | "ltb" | "seg" | "spliced" | "ext" | "curved" | "handling" | "fire" | "fatigue" | "lldf" | "diffsh" | "aemm" | "special" | "rating" | "opt" | "profiles" | "transpt" | "stm" | "deck" | "seismic" | "substructure" | "creepsh" | "madecont" | "rcgirder" | "foundation" | "snieq" | "cable" | "truss" | "seisdyn" | "dxf" | "forces" | "fem" | "plate" | "fem3d" | "straincompat" | "influence" | "timehistory" | "pushover" | "isolation" | "fibermc" | "shellsolve" | "slope" | "shellreinf" | "umat" | "bldgeq" | "hyst";
 
 interface Props {
   open: boolean;
@@ -282,6 +283,12 @@ const TABS: { key: ExtraTab; emoji: string; title: string; subtitle: string }[] 
     subtitle: "Bangunan gedung bertingkat — prosedur Gaya Lateral Ekuivalen ASCE 7-16/NEHRP (FEMA P-750): spektrum desain S_DS/S_D1, C_s, V=C_s·W, distribusi F_x, drift Δ & stabilitas P-Δ θ; jalur paralel Eurocode 8 (S_d(T1), F_b). Beda dari gempa jembatan (books GM 1, 118–256)",
   },
   {
+    key: "hyst",
+    emoji: "🔄",
+    title: "Histeresis & Respons Siklik Nonlinier",
+    subtitle: "Model histeresis rate-independent (bilinear kinematik / Bouc-Wen mulus / Takeda RC dengan degradasi kekakuan & pinching) → kurva F–u, energi disipasi E_D & redaman ekuivalen ξ_eq per siklus; riwayat-waktu NONLINIER Newmark-β + Newton-Raphson (duktilitas μ, energi histeretik, u residu); asesmen energi Park-Ang (DI); strat ekuivalen infill bata (Mainstone/FEMA 356). Melengkapi time-history linier 🌊 (books GM 257–272)",
+  },
+  {
     key: "snieq",
     emoji: "🌎",
     title: "Beban & Gempa SNI",
@@ -477,6 +484,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "foundation" && "Bowles 'Foundation Analysis and Design' 5th + Budhu 'Soil Mechanics and Foundations' + US Army TM 5-818-1 + Vulcanhammer (wave equation) + Das 'Principles of Soil Dynamics' + Richart/Ali (machine foundation) — kapasitas tiang statik (α/β/Meyerhof, Q_s+Q_p), grup, penurunan Vesic, lateral Broms, pemancangan dinamik, daya dukung dangkal Vesic, fondasi mesin half-space + SSI (books 194–205)"}
           {tab === "seisdyn" && "AASHTO Guide Specifications for LRFD Seismic Bridge Design + Caltrans SDC + Priestley/Calvi/Kowalsky 'Displacement-Based Seismic Design' + SNI 2833:2016 + Seed–Idriss/Youd (likuifaksi) — analisis dinamik substruktur: respons SDOF (T, Sd, V_base), modal 2-DOF SRSS, desain kapasitas pilar (M_po overstrength, L_p sendi plastis, μ_Δ daktilitas, P-Δ), pemicuan likuifaksi CSR/CRR/MSF (books 219–229; angka PDF bukan acuan — hanya prosedur)"}
           {tab === "bldgeq" && "ASCE/SEI 7-16 §11.4 + §12.8 (Equivalent Lateral Force) / NEHRP FEMA P-750 & FEMA 451 + IBC 2012 §1613 + SNI 1726 — gempa BANGUNAN GEDUNG bertingkat: spektrum desain S_a(T) (S_DS=⅔F_a·S_s, S_D1=⅔F_v·S_1, T0/Ts), kategori SDC, periode pendekatan T_a=C_t·h_n^x, koefisien C_s & geser dasar V=C_s·W, distribusi vertikal F_x=C_vx·V (k=1..2), drift δ_x=C_d·δ_xe/I_e ≤ Δ_a, stabilitas P-Δ θ=P_x·Δ·I_e/(V_x·h·C_d); jalur PARALEL Eurocode 8 EN 1998-1 §3.2.2.5 spektrum desain S_d(T) + §4.3.3.2 gaya dasar F_b=S_d(T1)·m·λ. BEDA dari gempa jembatan (seismic.ts/snieq/seisdyn). Angka contoh-desain FEMA/EC8 bukan acuan — hanya prosedur (books GM 1, 118–256)"}
+          {tab === "hyst" && "Pustaka GM 257–272 (model matematis histeresis Bouc-Wen/Takeda/T(x), dinamika nonlinier dengan degradasi kekuatan & kekakuan + pinching gaya ENGLTHA, asesmen energi seismik kolom RC/Park-Ang, kinerja siklik sambungan pracetak EC8, RC berisi dinding bata PEER/FEMA 356) — histeresis NONLINIER rate-independent: (1) konstitutif bilinear kinematik (return-mapping), Bouc-Wen mulus (ż=A·u̇−β|u̇||z|ⁿ⁻¹z−γu̇|z|ⁿ, F=αk₀u+(1−α)F_y·z), Takeda RC (k_unl=k₀(u_y/u_max)^β_s + pinching); (2) kurva F–u protokol amplitudo bertingkat → E_D & ξ_eq=E_D/(4πE_so) (elasto-plastis ξ=(2/π)(1−1/μ)); (3) riwayat-waktu NONLINIER Newmark-β γ=½ β=¼ + iterasi Newton-Raphson pada gaya pemulih → μ demand, energi histeretik, u residu; (4) indeks kerusakan Park-Ang DI=μ/μ_cap+β·E_H/(F_y·u_u); (5) strat diagonal ekuivalen infill bata Mainstone/FEMA 356 (λ₁, a=0,175(λ₁h)⁻⁰·⁴·r). Melengkapi time-history LINIER 🌊. Angka contoh PDF bukan acuan — hanya prosedur/model"}
           {tab === "snieq" && "SNI 2833:2016 'Perencanaan jembatan terhadap beban gempa' — spektrum respons As/S_DS/S_D1/T0/Ts/C_sm, zona (SDC), faktor R · SNI 1725:2016 'Pembebanan untuk jembatan' — angin (EWs/EWl), gaya rem TB, beban suhu EUn (books 207/211)"}
           {tab === "cable" && "Niels J. Gimsing & Christos T. Georgakis, 'Cable Supported Bridges — Concept and Design' 3rd Ed — cable-stayed: layout fan/harp/semi-fan, gaya stay = beban tributari/sinθ, luas perlu, modulus efektif Ernst (sag), aksial pilon & tekan dek (book 209)"}
           {tab === "truss" && "Prof. Taufiq Rochman & Suhariyanto, 'Desain Jembatan Rangka Baja' (2024) + AASHTO LRFD / SNI 1729 — rangka Pratt/Warren/Howe: beban titik buhul, gaya chord M/h & diagonal V/sinθ, kapasitas tarik (leleh) & tekan (tekuk lentur F_cr) (book 210)"}
@@ -554,6 +562,7 @@ export function ExtraCalculators({ open, onClose }: Props) {
           {tab === "isolation" && <BaseIsolationCalculator />}
           {tab === "snieq" && <SeismicSNICalculator />}
           {tab === "bldgeq" && <BuildingSeismicCalculator />}
+          {tab === "hyst" && <HysteresisCalculator />}
           {tab === "cable" && <CableStayedCalculator />}
           {tab === "truss" && <SteelTrussCalculator />}
           {tab === "profiles" && <ProfileDatabaseCalculator />}

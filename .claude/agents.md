@@ -84,6 +84,7 @@ Your only job is to read generated values and assert they are within ±0.5% of t
 - FEM vs theory (`tests/benchmark.test.ts`): fixed-fixed wL⁴/384EI, prop 3wL/8, Euler buckling π²EI/L², 2-DOF eigen golden-ratio.
 - Geotech (`tests/geotech_verif.test.ts`): Terzaghi U–Tv (0.197/0.848), Mohr-Coulomb q_f=200, bearing Nc=5.14/Nq=18.40.
 - Building seismic (`tests/buildingseismic.test.ts`): ASCE 7-16 spectrum/Cs/V/ΣCvx=1 identities + EC8 plateau (FEMA/EC8 numbers are example-only → assert the code equations, not the worked examples).
+- Hysteresis/cyclic (`tests/hysteresis.test.ts`): closed-form identities E_D=4Fy(um−uy), ξ_eq=(2/π)(1−1/μ), elasto-plastic F capped ±Fy, post-yield k1=αk0, Bouc-Wen z_max=(A/(β+γ))^(1/n), Takeda degraded loop < non-degraded, Park-Ang DI terms, Mainstone strut λ1/a (GM 257–272 textbook numbers are NOT references → assert the model equations).
 
 ---
 

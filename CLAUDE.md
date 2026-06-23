@@ -23,7 +23,7 @@ Pustaka referensi bernomor (semua sudah ditinjau — ambil prosedur/urutan, buka
 - **`1.pdf`–`255.pdf`** + **`ST1`–`ST3`** (STAAD.Pro) — buku teks/manual desain prategang, jembatan, fondasi, gempa, FEM.
 - **`MD (1)`–`MD (522)`** (+`.chm` biner, `.jpg/.gif` gambar) — MIDAS technical refs/Gen+Civil tutorials + **MIDAS FEA Verification Manual** (MD174+, angka = acuan mutlak) + MIDAS GTS/DIANA geoteknik (470–522).
 - **`SP (1)`–`SP (12)`** + `CSiBridge Enhancements….html` — CSiBridge.
-- **`GM (1)`, `GM (118)`–`GM (256)`** — pustaka **rekayasa gempa BANGUNAN GEDUNG**: FEMA 451 / P-750 NEHRP, ASCE 7-10/7-16, IBC 2012, Eurocode 8, isolasi seismik (Naeim & Kelly), analisis nonlinier (NIST/PEER/ATC), ACI 318-19, strut-and-tie, SNI/BSN.
+- **`GM (1)`, `GM (118)`–`GM (272)`** — pustaka **rekayasa gempa BANGUNAN GEDUNG**: FEMA 451 / P-750 NEHRP, ASCE 7-10/7-16, IBC 2012, Eurocode 8, isolasi seismik (Naeim & Kelly), analisis nonlinier (NIST/PEER/ATC), ACI 318-19, strut-and-tie, SNI/BSN. **GM 257–272 = model histeresis & dinamika nonlinier** (Bouc-Wen/Takeda/T(x), ENGLTHA degradasi+pinching, asesmen energi kolom RC/Park-Ang, kinerja siklik sambungan pracetak EC8, RC berisi dinding bata PEER/FEMA 356) → `hysteresis.ts` 🔄.
 - **`*.dwg`** (54 file shop-drawing AutoCAD biner; dibaca via konverter DWG→DXF terpasang) + **`O1.pdf`–`O10.pdf`** (acuan gaya output OriginPro) + **`A/B/C.pdf`** + `*.png` (rujukan dasar GAMBAR output DED) + `gambar ALLPLAN.xlsx`, `170.xls`, `174.jpg`, `123.ppm`.
 
 ## Project Overview
@@ -38,8 +38,8 @@ Pustaka referensi bernomor (semua sudah ditinjau — ambil prosedur/urutan, buka
 - **Detailing / SLS-ULS add-ons:** `mcft` (sectional shear + long-rebar tie) · `straincompat` 🎚 · `fatigue` 🔁 · `curvedtendon` ➰ · `transversept` 🔲 · `strutandtie` ▽ · `deckslab` 🛞 · `diffshrinkage` 💧 · `development` · `torsion` · `anchorage`.
 - **Long-term:** `aemm` ⏳ · `creepshrinkage` 🕰 · `handling` 🏭 · `lateralstability` 🌀.
 - **Substructure & foundation (ordinary RC):** `substructure` 🏛️ · `pilefoundation`/`foundationdynamics` 🪨 · `consolidation`+`mohrcoulomb`+`slopestability` ⛰ · `shellreinf` ◫.
-- **Seismic:** bridge → `seismic` 🌐 · `sni2833seismic` 🌎 · `seismicdynamics` 🌋 · `baseisolation` 🛡; **building → `buildingseismic` 🏙️ (ASCE 7-16/NEHRP ELF + Eurocode 8, GM library).**
-- **Analysis ecosystem (FEM/FEA):** `fem/` (core LU + CG sparse backend + native seam) · frame 2D 🧮 · frame3d 🧊 · plate ▦ · shellsolver ▣ · influence 📉 · pushover 📈 · timehistory 🌊 · fibermomentcurvature 🧵 · `umat` ⚗ · `pdelta`/`designcheck`.
+- **Seismic:** bridge → `seismic` 🌐 · `sni2833seismic` 🌎 · `seismicdynamics` 🌋 · `baseisolation` 🛡; **building → `buildingseismic` 🏙️ (ASCE 7-16/NEHRP ELF + Eurocode 8, GM library)**; **nonlinear cyclic → `hysteresis` 🔄 (bilinear/Bouc-Wen/Takeda + nonlinear Newmark TH + Park-Ang + infill strut, GM 257–272).**
+- **Analysis ecosystem (FEM/FEA):** `fem/` (core LU + CG sparse backend + native seam) · frame 2D 🧮 · frame3d 🧊 · plate ▦ · shellsolver ▣ · influence 📉 · pushover 📈 · timehistory 🌊 (linear) · `hysteresis` 🔄 (nonlinear) · fibermomentcurvature 🧵 · `umat` ⚗ · `pdelta`/`designcheck`.
 - **Other structures:** `cablestayed` 🪢 · `steeltruss` 🔺 · `specialmembers` 🧪 (pipe/pole/sleeper) · tank/column/slab/corbel/dapped/bearing/grade.
 - **Output & I/O:** `designsheet`/`SectionDiagram` 📋 (DED drawing) · `internalforces` 📊 · `dxfimport`+`dwgConvert` 📐 · `presets`/`strands` 📚 · `optimization` 💰 · `rating` 🏷 · `fireresistance` 🔥 · `distribution` 🛤 · Supabase save/load.
 
@@ -180,6 +180,24 @@ Cs = SDS/(R/Ie), capped SD1/(T·R/Ie), floor max(0.044·SDS·Ie, 0.01; 0.5·S1/(
 V = Cs·W ;  Fx = (wx·hx^k / Σwi·hi^k)·V  (k=1..2)
 δx = Cd·δxe/Ie ;  P-Δ:  θ = Px·Δ·Ie/(Vx·hsx·Cd) ≤ θmax
 EC8 parallel:  Sd(T) (EN 1998-1 §3.2.2.5),  Fb = Sd(T1)·m·λ
+```
+
+### Nonlinear hysteresis & cyclic response (`hysteresis.ts`)
+
+```
+Bilinear kinematic (return-mapping):  H_d = α·k0/(1−α) ;  k1 = α·k0
+   F_trial = F + k0·Δu ;  f = |F_trial − q| − Fy ;  if f>0: Δu_p = f/(k0+H_d),
+   F = F_trial − k0·sgn·Δu_p ,  q += H_d·sgn·Δu_p  (elasto-plastic α=0 ⇒ F capped ±Fy)
+Bouc-Wen (smooth):  ż = A·u̇ − β|u̇||z|^(n−1)z − γ·u̇|z|^n ;  F = α·k0·u + (1−α)·Fy·z
+   z_max = (A/(β+γ))^(1/n)   (monotonic saturation)
+Takeda (RC degrading):  k_unload = k0·(u_y/u_max)^β_s · pinch  (envelope = bilinear)
+Energy/damping per loop:  E_D = ∮F du ;  ξ_eq = E_D/(4π·E_so), E_so = ½·k_sec·u_m²
+   elasto-plastic ⇒ ξ_eq = (2/π)(1 − 1/μ)
+Nonlinear TH:  Newmark-β (γ=½,β=¼) + Newton on g(u)=p − m·a − c·v − F_int(u),
+   k_eff = m/(βΔt²) + c·γ/(βΔt) + k_T ;  μ = u_peak/u_y
+Park-Ang damage:  DI = μ/μ_cap + β_PA·E_H/(Fy·u_u),  u_u = μ_cap·u_y
+Infill strut (Mainstone/FEMA 356):  λ1 = [Em·t·sin2θ/(4·Ec·Icol·h_inf)]^¼ ,
+   a = 0.175·(λ1·h_col)^(−0.4)·r_inf
 ```
 
 ---
